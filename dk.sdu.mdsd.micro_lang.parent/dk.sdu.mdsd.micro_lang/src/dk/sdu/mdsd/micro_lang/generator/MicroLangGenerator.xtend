@@ -267,6 +267,7 @@ class MicroLangGenerator extends AbstractGenerator {
 	def generateMethodInvocation(Endpoint endpoint, Operation operation)'''
 		«FOR entry : endpoint.mapParametersToIndex.entrySet»
 			«entry.key.generateVariableAssignment('''path.split("/")[«entry.value»]''')»
+			«entry.key.generateRequireLogic»
 		«ENDFOR»
 		«FOR param : operation.parameters»
 			«param.type.generateType» «param.name» = parameters.get("«param.name»") != null ? «param.type.generateTypeCast('''parameters.get("«param.name»")''')» : «param.type.generateInitialTypeValue»;
@@ -309,12 +310,27 @@ class MicroLangGenerator extends AbstractGenerator {
 				util.sendResponse(exchange, 400, "Parameter «param.name» is required");
 				return;
 			}
+			«param.generateRequireLogic»
 			'''
 		}
 	}
 	
-	def generateRequireLogic(Require require) {
-		
+	def generateRequireLogic(TypedParameter param) {
+		val result = new StringBuilder()
+		if(param.require.logic !== null) {
+			param.require.logic.compares.forEach[item | 
+				//System.out.println(item.left.attribute + " " + item.op.operator + " " + item.right)
+				result.append(
+					'''
+					if (!(«param.generateRequireAttributeMethodCall(item.left.attribute)» «item.op.operator» «item.right.resolve»)){
+						util.sendResponse(exchange, 400, "Parameter «param.name» must hold «item.left.attribute» «item.op.operator» «item.right.resolve»");
+						return;
+					}
+					'''
+				)
+			]
+		}
+		result
 	}
 	
 	def isRequired(TypedParameter param) {
@@ -344,6 +360,20 @@ class MicroLangGenerator extends AbstractGenerator {
 			case "double": "0"
 			case "bool": "false"
 			default: "null"
+		}
+	}
+	
+	def generateRequireAttributeMethodCall(TypedParameter param, String attribute) {
+		switch param.type.name {
+			case "string": 
+				switch attribute {
+					case "length": '''«param.name».length()'''
+				}
+			case "int",
+			case "double":
+				switch attribute {
+					case "value": param.name 
+				}
 		}
 	}
 	
