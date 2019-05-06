@@ -25,6 +25,7 @@ import org.eclipse.xtext.generator.IGeneratorContext
 import static org.eclipse.emf.ecore.util.EcoreUtil.UsageCrossReferencer.find
 
 import static extension dk.sdu.mdsd.micro_lang.generator.NameAndPackage.operator_mappedTo
+import dk.sdu.mdsd.micro_lang.microLang.Require
 
 /**
  * Generates code from your model files on save.
@@ -268,7 +269,8 @@ class MicroLangGenerator extends AbstractGenerator {
 			«entry.key.generateVariableAssignment('''path.split("/")[«entry.value»]''')»
 		«ENDFOR»
 		«FOR param : operation.parameters»
-			«param.generateVariableAssignment('''parameters.get("«param.name»")''')»
+			«param.type.generateType» «param.name» = parameters.get("«param.name»") != null ? «param.type.generateTypeCast('''parameters.get("«param.name»")''')» : «param.type.generateInitialTypeValue»;
+			«param.generateRequire»
 		«ENDFOR»
 		«IF operation.hasReturn»Object response = «ENDIF»«endpoint.toMethodName(operation)»«(endpoint.mapParametersToIndex.keySet + operation.parameters).generateArguments»;
 		util.sendResponse(exchange, 200«IF operation.hasReturn», response«ENDIF»);
@@ -300,6 +302,25 @@ class MicroLangGenerator extends AbstractGenerator {
 		'''«returnType.type.generateType»'''
 	}
 	
+	def generateRequire(TypedParameter param) {
+		if(param.isRequired) {
+			'''
+			if (parameters.get("«param.name»") == null) {
+				util.sendResponse(exchange, 400, "Parameter «param.name» is required");
+				return;
+			}
+			'''
+		}
+	}
+	
+	def generateRequireLogic(Require require) {
+		
+	}
+	
+	def isRequired(TypedParameter param) {
+		param.require !== null
+	}
+	
 	def generateType(Type type) {
 		switch type.name {
 			case "string": "String"
@@ -315,6 +336,15 @@ class MicroLangGenerator extends AbstractGenerator {
 			default: type.name
 		}
 		name.toFirstUpper
+	}
+	
+	def generateInitialTypeValue(Type type) {
+		switch type.name {
+			case "int": "0"
+			case "double": "0"
+			case "bool": "false"
+			default: "null"
+		}
 	}
 	
 	def generateStubMethod(Endpoint endpoint, Operation operation)'''

@@ -12,6 +12,11 @@ import dk.sdu.mdsd.micro_lang.microLang.Return
 import dk.sdu.mdsd.micro_lang.microLang.Template
 import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
 import dk.sdu.mdsd.micro_lang.microLang.Uses
+import dk.sdu.mdsd.micro_lang.microLang.Logic
+import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
+import java.util.ArrayList
+import java.util.List
+import java.util.Set
 
 /**
  * Extension utility methods for the various classes of the meta-model.
@@ -86,6 +91,36 @@ class MicroLangModelUtil {
 	
 	def path(Endpoint endpoint) {
 		endpoint.mapPaths([name ?: ""], ['{' + parameter.type.name + '}'], '/')
+	}
+	
+	def dispatch List<String> attributes(Logic logic) {
+		val attributes = new ArrayList<String>()
+		attributes.addAll(logic.left.attributes)
+		if(logic.right !== null) {
+			attributes.addAll(logic.right.attributes)
+		}
+		attributes
+	}
+	
+	def dispatch List<String> attributes(LogicAnd logic) {
+		val attributesList = new ArrayList<String>()
+		attributesList.add(logic.left.left.attribute)
+		if(logic.right !== null) {
+			attributesList.addAll(logic.right.attributes)
+		}
+		
+		attributesList
+	}
+	
+	def printSet(Set<String> list) {
+		val builder = new StringBuilder()
+		list.forEach[item, index | 
+			if (index > 0) {
+				builder.append(", ")
+			}
+			builder.append(item)
+		]
+		builder.toString
 	}
 	
 }

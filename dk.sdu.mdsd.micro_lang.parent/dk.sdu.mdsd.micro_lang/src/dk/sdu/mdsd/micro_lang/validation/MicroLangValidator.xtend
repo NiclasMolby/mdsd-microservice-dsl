@@ -12,6 +12,7 @@ import dk.sdu.mdsd.micro_lang.microLang.NormalPath
 import dk.sdu.mdsd.micro_lang.microLang.Operation
 import dk.sdu.mdsd.micro_lang.microLang.Parameter
 import dk.sdu.mdsd.micro_lang.microLang.Return
+import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
 import dk.sdu.mdsd.micro_lang.microLang.Uses
 import java.util.Set
 import org.eclipse.emf.ecore.EObject
@@ -41,6 +42,8 @@ class MicroLangValidator extends AbstractMicroLangValidator {
 	public static val INVALID_MICROSERVICE_NAME = ISSUE_CODE_PREFIX + 'InvalidMicroserviceName'
 	
 	public static val INVALID_ENDPOINT_PATH_NAME = ISSUE_CODE_PREFIX + 'InvalidEndpointPathName'
+	
+	public static val INVALID_ATTRIBUTE_ON_REQUIRE = ISSUE_CODE_PREFIX + 'InvalidAttribute'
 	
 	val epackage = MicroLangPackage.eINSTANCE
 	
@@ -143,4 +146,34 @@ class MicroLangValidator extends AbstractMicroLangValidator {
 		}
 	}
 	
+	val allowedRequireAttributes = #{
+		"string" -> #["length"],
+		"int" -> #["value"],
+		"double" -> #['value'],
+		"bool" -> #[]
+	}
+	
+	@Check
+	def checkAttributeOnRequireIsValid(TypedParameter param) {
+		val type = param.type.name
+		val logic = param.require.logic
+		if (logic === null) {
+			return
+		}
+		
+		val attributes = logic.attributes
+		val allowedAttributes = this.allowedRequireAttributes.get(type)
+		
+		val illegalAttributes = attributes.filter[attribute | !allowedAttributes.contains(attribute)].toSet
+		
+		if (!illegalAttributes.empty) {
+			val attributeString = if(illegalAttributes.length > 1) "Attributes" else "Attribute"
+			error(attributeString + ' "' + illegalAttributes.printSet + '" can not be used on type "' + type + '"',
+				param,
+				epackage.typedParameter_Require,
+				INVALID_ATTRIBUTE_ON_REQUIRE
+			)
+		}
+	}
 }
+

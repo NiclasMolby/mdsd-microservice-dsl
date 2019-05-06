@@ -101,7 +101,7 @@ Logic:
 ;
 
 LogicAnd:
-	left=ExternOrCompare ('&&' right=LogicAnd)?
+	left=Compare ('&&' right=LogicAnd)?
 ;
 
 ExternOrCompare:
