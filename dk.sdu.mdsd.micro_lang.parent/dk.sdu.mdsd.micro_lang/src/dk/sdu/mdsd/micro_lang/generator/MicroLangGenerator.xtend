@@ -267,7 +267,7 @@ class MicroLangGenerator extends AbstractGenerator {
 	def generateMethodInvocation(Endpoint endpoint, Operation operation)'''
 		«FOR entry : endpoint.mapParametersToIndex.entrySet»
 			«entry.key.generateVariableAssignment('''path.split("/")[«entry.value»]''')»
-			«entry.key.generateRequireLogic»
+			«IF entry.key.isRequired»«entry.key.generateRequireLogic»«ENDIF»
 		«ENDFOR»
 		«FOR param : operation.parameters»
 			«param.type.generateType» «param.name» = parameters.get("«param.name»") != null ? «param.type.generateTypeCast('''parameters.get("«param.name»")''')» : «param.type.generateInitialTypeValue»;

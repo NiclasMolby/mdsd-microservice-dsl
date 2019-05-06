@@ -19,6 +19,7 @@ import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.validation.Check
 
 import static org.eclipse.emf.ecore.util.EcoreUtil.UsageCrossReferencer.find
+import dk.sdu.mdsd.micro_lang.microLang.ParameterPath
 
 /**
  * This class contains custom validation rules. 
@@ -44,6 +45,8 @@ class MicroLangValidator extends AbstractMicroLangValidator {
 	public static val INVALID_ENDPOINT_PATH_NAME = ISSUE_CODE_PREFIX + 'InvalidEndpointPathName'
 	
 	public static val INVALID_ATTRIBUTE_ON_REQUIRE = ISSUE_CODE_PREFIX + 'InvalidAttribute'
+	
+	public static val NO_ATTRIBUTE_ON_PARAMETER_PATH_REQUIRE = ISSUE_CODE_PREFIX + 'NoAttributeOnRequire'
 	
 	val epackage = MicroLangPackage.eINSTANCE
 	
@@ -170,6 +173,18 @@ class MicroLangValidator extends AbstractMicroLangValidator {
 			val attributeString = if(illegalAttributes.length > 1) "Attributes" else "Attribute"
 			error(attributeString + ' "' + illegalAttributes.printSet + '" can not be used on type "' + type + '"',
 				param,
+				epackage.typedParameter_Require,
+				INVALID_ATTRIBUTE_ON_REQUIRE
+			)
+		}
+	}
+	
+	@Check
+	def checkParameterPathRequireContainsAttributes(ParameterPath param) {
+		val logic = param.parameter.require.logic
+		if (logic === null) {
+			warning('The "require" keyword is not necessary on parameters in the path without logic conditions',
+				param.parameter,
 				epackage.typedParameter_Require,
 				INVALID_ATTRIBUTE_ON_REQUIRE
 			)
