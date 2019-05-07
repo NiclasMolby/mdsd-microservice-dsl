@@ -24,7 +24,7 @@ Template:
 ;
 
 Microservice:
-	'microservice' name=ID location=Location
+	'microservice' name=ID location=Location (auth?=Auth)?
 	(BEGIN
 		declarations+=Declaration*
 	END)*
@@ -61,12 +61,16 @@ PathPart:
 	NormalPath | ParameterPath
 ;
 
+Auth:
+	{Auth} 'auth'
+;
+
 NormalPath:
-	{NormalPath} '/' (name=ID | '{' target=[Parameter] '}')?
+	{NormalPath} '/' (name=ID | '{' target=[Parameter] '}')? (auth?=Auth)?
 ;
 
 ParameterPath:
-	'/' '{' parameter=TypedParameter '}'
+	'/' '{' parameter=TypedParameter '}' (auth?=Auth)?
 ;
 
 Operation:

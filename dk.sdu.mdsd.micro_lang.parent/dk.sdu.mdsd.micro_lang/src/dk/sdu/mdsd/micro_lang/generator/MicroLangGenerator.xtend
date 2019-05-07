@@ -9,6 +9,8 @@ import dk.sdu.mdsd.micro_lang.MicroLangModelUtil
 import dk.sdu.mdsd.micro_lang.microLang.Argument
 import dk.sdu.mdsd.micro_lang.microLang.Endpoint
 import dk.sdu.mdsd.micro_lang.microLang.Implements
+import dk.sdu.mdsd.micro_lang.microLang.Logic
+import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
 import dk.sdu.mdsd.micro_lang.microLang.Method
 import dk.sdu.mdsd.micro_lang.microLang.Microservice
 import dk.sdu.mdsd.micro_lang.microLang.NormalPath
@@ -25,7 +27,6 @@ import org.eclipse.xtext.generator.IGeneratorContext
 import static org.eclipse.emf.ecore.util.EcoreUtil.UsageCrossReferencer.find
 
 import static extension dk.sdu.mdsd.micro_lang.generator.NameAndPackage.operator_mappedTo
-import dk.sdu.mdsd.micro_lang.microLang.Require
 
 /**
  * Generates code from your model files on save.
@@ -247,6 +248,7 @@ class MicroLangGenerator extends AbstractGenerator {
 				«ENDFOR»
 				default:
 					util.sendResponse(exchange, 405, method + " is not implemented on " + path);
+					return;
 			}
 		}
 	'''
@@ -316,21 +318,40 @@ class MicroLangGenerator extends AbstractGenerator {
 	}
 	
 	def generateRequireLogic(TypedParameter param) {
-		val result = new StringBuilder()
 		if(param.require.logic !== null) {
-			param.require.logic.compares.forEach[item | 
-				//System.out.println(item.left.attribute + " " + item.op.operator + " " + item.right)
-				result.append(
-					'''
-					if (!(«param.generateRequireAttributeMethodCall(item.left.attribute)» «item.op.operator» «item.right.resolve»)){
-						util.sendResponse(exchange, 400, "Parameter «param.name» must hold «item.left.attribute» «item.op.operator» «item.right.resolve»");
-						return;
-					}
-					'''
-				)
-			]
+			System.out.println(param.require.logic.generateLogicCondition(param))
+			'''
+			if («param.require.logic.generateLogicCondition(param)») {
+				util.sendResponse(exchange, 400, "Parameter must hold required conditions");
+				return;
+			}
+			'''
 		}
-		result
+	}
+	
+	def String generateLogicCondition(Logic logic, TypedParameter param) {
+		val builder = new StringBuilder()
+		
+		builder.append(logic.left.generateLogicCondition(param))
+		if(logic.right !== null) {
+			builder.append(" || ")
+			builder.append(logic.right.generateLogicCondition(param))
+		}
+		
+		builder.toString
+	}
+	
+	def String generateLogicCondition(LogicAnd logic, TypedParameter param) {
+		val builder = new StringBuilder()
+		
+		builder.append('''!(«param.generateRequireAttributeMethodCall(logic.left.left.attribute)» «logic.left.op.operator» «logic.left.right.resolve»)''')
+
+		if(logic.right !== null) {
+			builder.append(" && ")
+			builder.append(logic.right.generateLogicCondition(param))
+		}
+		
+		builder.toString
 	}
 	
 	def isRequired(TypedParameter param) {

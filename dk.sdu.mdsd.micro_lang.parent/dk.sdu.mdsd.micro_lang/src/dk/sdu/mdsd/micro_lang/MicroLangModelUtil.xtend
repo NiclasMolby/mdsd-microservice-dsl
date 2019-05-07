@@ -1,30 +1,29 @@
 package dk.sdu.mdsd.micro_lang
 
+import dk.sdu.mdsd.micro_lang.microLang.COp
+import dk.sdu.mdsd.micro_lang.microLang.Div
 import dk.sdu.mdsd.micro_lang.microLang.Element
 import dk.sdu.mdsd.micro_lang.microLang.Endpoint
+import dk.sdu.mdsd.micro_lang.microLang.Exp
 import dk.sdu.mdsd.micro_lang.microLang.Implements
+import dk.sdu.mdsd.micro_lang.microLang.Logic
+import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
 import dk.sdu.mdsd.micro_lang.microLang.Microservice
+import dk.sdu.mdsd.micro_lang.microLang.Minus
 import dk.sdu.mdsd.micro_lang.microLang.Model
+import dk.sdu.mdsd.micro_lang.microLang.Mult
 import dk.sdu.mdsd.micro_lang.microLang.NormalPath
+import dk.sdu.mdsd.micro_lang.microLang.Number
 import dk.sdu.mdsd.micro_lang.microLang.Operation
 import dk.sdu.mdsd.micro_lang.microLang.ParameterPath
+import dk.sdu.mdsd.micro_lang.microLang.Plus
 import dk.sdu.mdsd.micro_lang.microLang.Return
 import dk.sdu.mdsd.micro_lang.microLang.Template
 import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
 import dk.sdu.mdsd.micro_lang.microLang.Uses
-import dk.sdu.mdsd.micro_lang.microLang.Logic
-import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
 import java.util.ArrayList
 import java.util.List
 import java.util.Set
-import dk.sdu.mdsd.micro_lang.microLang.Compare
-import dk.sdu.mdsd.micro_lang.microLang.COp
-import dk.sdu.mdsd.micro_lang.microLang.Exp
-import dk.sdu.mdsd.micro_lang.microLang.Plus
-import dk.sdu.mdsd.micro_lang.microLang.Minus
-import dk.sdu.mdsd.micro_lang.microLang.Mult
-import dk.sdu.mdsd.micro_lang.microLang.Div
-import dk.sdu.mdsd.micro_lang.microLang.Number
 
 /**
  * Extension utility methods for the various classes of the meta-model.
@@ -99,24 +98,6 @@ class MicroLangModelUtil {
 	
 	def path(Endpoint endpoint) {
 		endpoint.mapPaths([name ?: ""], ['{' + parameter.type.name + '}'], '/')
-	}
-	
-	def List<Compare> compares(Logic logic) {
-		val attributes = new ArrayList<Compare>()
-		attributes.addAll(logic.left.compares)
-		if(logic.right !== null) {
-			attributes.addAll(logic.right.compares)
-		}
-		attributes
-	}
-	
-	def List<Compare> compares(LogicAnd logic) {
-		val attributes = new ArrayList<Compare>()
-		attributes.addAll(logic.left)
-		if(logic.right !== null) {
-			attributes.addAll(logic.right.compares)
-		}
-		attributes
 	}
 	
 	def dispatch List<String> attributes(Logic logic) {
