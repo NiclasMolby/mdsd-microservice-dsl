@@ -5,6 +5,9 @@ import dk.sdu.mdsd.micro_lang.microLang.Div
 import dk.sdu.mdsd.micro_lang.microLang.Element
 import dk.sdu.mdsd.micro_lang.microLang.Endpoint
 import dk.sdu.mdsd.micro_lang.microLang.Exp
+import dk.sdu.mdsd.micro_lang.microLang.Gateway
+import dk.sdu.mdsd.micro_lang.microLang.GatewayGivenPath
+import dk.sdu.mdsd.micro_lang.microLang.Given
 import dk.sdu.mdsd.micro_lang.microLang.Implements
 import dk.sdu.mdsd.micro_lang.microLang.Logic
 import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
@@ -16,12 +19,14 @@ import dk.sdu.mdsd.micro_lang.microLang.NormalPath
 import dk.sdu.mdsd.micro_lang.microLang.Number
 import dk.sdu.mdsd.micro_lang.microLang.Operation
 import dk.sdu.mdsd.micro_lang.microLang.ParameterPath
+import dk.sdu.mdsd.micro_lang.microLang.PathPart
 import dk.sdu.mdsd.micro_lang.microLang.Plus
 import dk.sdu.mdsd.micro_lang.microLang.Return
 import dk.sdu.mdsd.micro_lang.microLang.Template
 import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
 import dk.sdu.mdsd.micro_lang.microLang.Uses
 import java.util.ArrayList
+import java.util.HashSet
 import java.util.List
 import java.util.Set
 
@@ -40,6 +45,15 @@ class MicroLangModelUtil {
 	
 	def uses(Element element) {
 		element.declarations.filter(Uses).map[target]
+	}
+	
+	def references(Gateway gateway) {
+		val microserviceReference = new HashSet<Microservice>()
+		gateway.declarations.filter(Endpoint).map[operations].flatten.forEach[op | op.statements.filter(Given).forEach[given | 
+			microserviceReference.add(given.left.microservice)
+			microserviceReference.add(given.right.microservice)
+		]]
+		microserviceReference
 	}
 	
 	def getImplements(Element element) {
@@ -87,8 +101,8 @@ class MicroLangModelUtil {
 		endpoint.pathParts.filter(ParameterPath)
 	}
 	
-	def mapPaths(Endpoint endpoint, (NormalPath) => CharSequence computeNormalPaths, (ParameterPath) => CharSequence computeParameterPaths, String prefixAndJoin) {
-		prefixAndJoin + endpoint.pathParts.map[
+	def mapPaths(List<PathPart> pathParts, (NormalPath) => CharSequence computeNormalPaths, (ParameterPath) => CharSequence computeParameterPaths, String prefixAndJoin) {
+		prefixAndJoin + pathParts.map[
 			switch it {
 				NormalPath: computeNormalPaths.apply(it)
 				ParameterPath: computeParameterPaths.apply(it)
@@ -96,8 +110,16 @@ class MicroLangModelUtil {
 		].join(prefixAndJoin)
 	}
 	
+	def path(List<GatewayGivenPath> path) {
+		"/"+path.map[name ?: target.name].join("/")
+	}
+	
 	def path(Endpoint endpoint) {
-		endpoint.mapPaths([name ?: ""], ['{' + parameter.type.name + '}'], '/')
+		endpoint.pathParts.mapPaths([name ?: ""], ['{' + parameter.type.name + '}'], '/')
+	}
+	
+	def containsGiven(Operation operation) {
+		!operation.statements.filter(Given).empty
 	}
 	
 	def dispatch List<String> attributes(Logic logic) {
@@ -162,5 +184,13 @@ class MicroLangModelUtil {
 	
 	def dispatch int comp(Number num) {
 		num.value
+	}
+	
+	def attribute(LogicAnd logic) {
+		logic.left.left.attribute
+	}
+	
+	def exp(LogicAnd logic) {
+		logic.left.right
 	}
 }

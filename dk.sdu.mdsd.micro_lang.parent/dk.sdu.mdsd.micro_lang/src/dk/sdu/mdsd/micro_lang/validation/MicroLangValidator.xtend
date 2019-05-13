@@ -11,15 +11,16 @@ import dk.sdu.mdsd.micro_lang.microLang.Microservice
 import dk.sdu.mdsd.micro_lang.microLang.NormalPath
 import dk.sdu.mdsd.micro_lang.microLang.Operation
 import dk.sdu.mdsd.micro_lang.microLang.Parameter
+import dk.sdu.mdsd.micro_lang.microLang.ParameterPath
 import dk.sdu.mdsd.micro_lang.microLang.Return
 import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
 import dk.sdu.mdsd.micro_lang.microLang.Uses
+import dk.sdu.mdsd.micro_lang.microLang.impl.GatewayImpl
 import java.util.Set
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.validation.Check
 
 import static org.eclipse.emf.ecore.util.EcoreUtil.UsageCrossReferencer.find
-import dk.sdu.mdsd.micro_lang.microLang.ParameterPath
 
 /**
  * This class contains custom validation rules. 
@@ -48,10 +49,22 @@ class MicroLangValidator extends AbstractMicroLangValidator {
 	
 	public static val NO_ATTRIBUTE_ON_PARAMETER_PATH_REQUIRE = ISSUE_CODE_PREFIX + 'NoAttributeOnRequire'
 	
+	public static val GIVEN_ON_NON_GATEWAY_ELEMENT = ISSUE_CODE_PREFIX + 'GivenOnNonGatewayElement'
+	
 	val epackage = MicroLangPackage.eINSTANCE
 	
 	@Inject
 	extension MicroLangModelUtil
+	
+	@Check
+	def checkGivenOnElement(Operation operation) {
+		if(operation.containsGiven && !(operation.eContainer.eContainer instanceof GatewayImpl)) {
+			error("The 'given' keyword can only be used on Gateways", 
+			operation, 
+			epackage.operation_Statements, 
+			GIVEN_ON_NON_GATEWAY_ELEMENT)
+		}
+	}
 	
 	@Check
 	def checkSelfNotInUses(Uses uses) {

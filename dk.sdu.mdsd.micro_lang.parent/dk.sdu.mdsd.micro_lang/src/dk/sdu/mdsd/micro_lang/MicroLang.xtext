@@ -13,7 +13,12 @@ terminal END: 'synthetic:END';
 terminal IP returns ecore::EString: INT ('.' INT)+;
 
 Element:
-	Template | Microservice
+	Template | Usable//Microservice | Gateway
+;
+
+
+Usable:
+	Microservice | Gateway
 ;
 
 Template:
@@ -24,7 +29,14 @@ Template:
 ;
 
 Microservice:
-	'microservice' name=ID location=Location (auth?=Auth)?
+	'microservice' name=ID location=Location
+	(BEGIN
+		declarations+=Declaration*
+	END)*
+;
+
+Gateway:
+	'gateway' name=ID location=Location
 	(BEGIN
 		declarations+=Declaration*
 	END)*
@@ -38,8 +50,9 @@ Declaration:
 	Uses | Implements | Endpoint
 ;
 
+
 Uses:
-	'uses' target=[Microservice]
+	'uses' target=[Usable]//(target=[Gateway] | target=[Microservice])
 ;
 
 Implements:
@@ -61,16 +74,16 @@ PathPart:
 	NormalPath | ParameterPath
 ;
 
-Auth:
-	{Auth} 'auth'
+NormalPath:
+	{NormalPath} '/' (name=ID | '{' target=[Parameter] '}')?
 ;
 
-NormalPath:
-	{NormalPath} '/' (name=ID | '{' target=[Parameter] '}')? (auth?=Auth)?
+GatewayGivenPath:
+	{GatewayGivenPath} '/' (name=ID | '{' target=[TypedParameter] '}')?
 ;
 
 ParameterPath:
-	'/' '{' parameter=TypedParameter '}' (auth?=Auth)?
+	'/' '{' parameter=TypedParameter '}'
 ;
 
 Operation:
@@ -85,7 +98,7 @@ Method:
 ;
 
 Statement:
-	TypedParameter | Return
+	TypedParameter | Return | Given
 ;
 
 Parameter:
@@ -94,6 +107,14 @@ Parameter:
 
 TypedParameter:
 	type=Type (name=ID | '{' target=[Parameter] '}') (require=Require)?
+;
+
+Given:
+	'given' condition=ID left=MicroserviceEndpoint 'else' right=MicroserviceEndpoint
+;
+
+MicroserviceEndpoint:
+	microservice=[Microservice] pathParts+=GatewayGivenPath+
 ;
 
 Require:
