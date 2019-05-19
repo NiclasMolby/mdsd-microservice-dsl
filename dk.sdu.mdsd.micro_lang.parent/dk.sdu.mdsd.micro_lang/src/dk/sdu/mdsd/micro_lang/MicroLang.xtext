@@ -110,7 +110,11 @@ TypedParameter:
 ;
 
 Given:
-	'given' condition=ID left=MicroserviceEndpoint 'else' right=MicroserviceEndpoint
+	'given' condition=GatewayCondition left=MicroserviceEndpoint 'else' right=MicroserviceEndpoint
+;
+
+GatewayCondition:
+	(parameter=[TypedParameter] | endpoint=MicroserviceEndpoint) (op=COp comparison=INT)?
 ;
 
 MicroserviceEndpoint:

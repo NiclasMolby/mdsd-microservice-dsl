@@ -3,6 +3,18 @@
  */
 package dk.sdu.mdsd.micro_lang.scoping
 
+import org.eclipse.emf.ecore.EObject
+import org.eclipse.emf.ecore.EReference
+import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
+import dk.sdu.mdsd.micro_lang.microLang.MicroLangPackage
+import org.eclipse.xtext.EcoreUtil2
+import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
+import org.eclipse.xtext.scoping.Scopes
+import dk.sdu.mdsd.micro_lang.microLang.impl.GivenImpl
+import com.google.inject.Inject
+import dk.sdu.mdsd.micro_lang.MicroLangModelUtil
+import dk.sdu.mdsd.micro_lang.microLang.Endpoint
+import dk.sdu.mdsd.micro_lang.microLang.impl.OperationImpl
 
 /**
  * This class contains custom scoping description.
@@ -11,5 +23,24 @@ package dk.sdu.mdsd.micro_lang.scoping
  * on how and when to use it.
  */
 class MicroLangScopeProvider extends AbstractMicroLangScopeProvider {
-
+	@Inject
+	extension MicroLangModelUtil
+	
+	override getScope(EObject context, EReference reference) {
+		if (context instanceof GatewayCondition && reference == MicroLangPackage.Literals.GATEWAY_CONDITION__PARAMETER) {
+	        val container = context.eContainer as GivenImpl
+	        val endpoint = container.left.microservice.declarations.filter(Endpoint).findFirst[endpoint |
+	        	endpoint.pathToCompare == container.left.pathParts.path
+	        ]
+	        
+	        val givenOperation = container.eContainer as OperationImpl
+	        val wantedScope = endpoint.operations.findFirst[operation |
+	        	operation.method.name == givenOperation.method.name
+	        ]
+	       
+	        val candidates = EcoreUtil2.getAllContentsOfType(wantedScope, TypedParameter)
+	        return Scopes.scopeFor(candidates)
+    	}
+		super.getScope(context, reference)
+	}
 }

@@ -118,6 +118,14 @@ class MicroLangModelUtil {
 		endpoint.pathParts.mapPaths([name ?: ""], ['{' + parameter.type.name + '}'], '/')
 	}
 	
+	def pathToCompare(List<GatewayGivenPath> path) {
+		"/"+path.map[name ?: "{" + target.type.name + "}" ].join("/")
+	}
+	
+	def pathToCompare(Endpoint endpoint) {
+		endpoint.pathParts.mapPaths([name ?: ""], ['{' + parameter + '}'], '/')
+	}
+	
 	def containsGiven(Operation operation) {
 		!operation.statements.filter(Given).empty
 	}
