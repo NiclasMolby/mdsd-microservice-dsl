@@ -57,6 +57,9 @@ class MicroLangModelUtil {
 		gateway.declarations.filter(Endpoint).map[operations].flatten.forEach[op | op.statements.filter(Given).forEach[given | 
 			microserviceReference.add(given.left.microservice)
 			microserviceReference.add(given.right.microservice)
+			if (given.condition.endpoint !== null) {
+				microserviceReference.add(given.condition.endpoint.microservice)
+			}
 		]]
 		microserviceReference
 	}
