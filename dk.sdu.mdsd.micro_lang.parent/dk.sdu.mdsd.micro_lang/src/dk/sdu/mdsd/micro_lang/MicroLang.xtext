@@ -50,7 +50,6 @@ Declaration:
 	Uses | Implements | Endpoint
 ;
 
-
 Uses:
 	'uses' target=[Usable]//(target=[Gateway] | target=[Microservice])
 ;
@@ -114,7 +113,11 @@ Given:
 ;
 
 GatewayCondition:
-	(parameter=[TypedParameter] | endpoint=MicroserviceEndpoint) (op=COp comparison=INT)?
+	(parameter=[TypedParameter] | endpoint=MicroserviceEndpoint) (op=COp comparison=Comparison)?
+;
+
+Comparison:
+	intValue=INT | stringValue=STRING
 ;
 
 MicroserviceEndpoint:

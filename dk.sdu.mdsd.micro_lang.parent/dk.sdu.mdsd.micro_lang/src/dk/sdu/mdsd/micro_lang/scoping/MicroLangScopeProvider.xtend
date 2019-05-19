@@ -3,18 +3,21 @@
  */
 package dk.sdu.mdsd.micro_lang.scoping
 
-import org.eclipse.emf.ecore.EObject
-import org.eclipse.emf.ecore.EReference
-import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
-import dk.sdu.mdsd.micro_lang.microLang.MicroLangPackage
-import org.eclipse.xtext.EcoreUtil2
-import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
-import org.eclipse.xtext.scoping.Scopes
-import dk.sdu.mdsd.micro_lang.microLang.impl.GivenImpl
 import com.google.inject.Inject
 import dk.sdu.mdsd.micro_lang.MicroLangModelUtil
 import dk.sdu.mdsd.micro_lang.microLang.Endpoint
+import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
+import dk.sdu.mdsd.micro_lang.microLang.Implements
+import dk.sdu.mdsd.micro_lang.microLang.MicroLangPackage
+import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
+import dk.sdu.mdsd.micro_lang.microLang.impl.EndpointImpl
+import dk.sdu.mdsd.micro_lang.microLang.impl.GivenImpl
 import dk.sdu.mdsd.micro_lang.microLang.impl.OperationImpl
+import org.eclipse.emf.ecore.EObject
+import org.eclipse.emf.ecore.EReference
+import org.eclipse.xtext.EcoreUtil2
+import org.eclipse.xtext.scoping.Scopes
+import java.util.ArrayList
 
 /**
  * This class contains custom scoping description.
@@ -29,17 +32,39 @@ class MicroLangScopeProvider extends AbstractMicroLangScopeProvider {
 	override getScope(EObject context, EReference reference) {
 		if (context instanceof GatewayCondition && reference == MicroLangPackage.Literals.GATEWAY_CONDITION__PARAMETER) {
 	        val container = context.eContainer as GivenImpl
-	        val endpoint = container.left.microservice.declarations.filter(Endpoint).findFirst[endpoint |
-	        	endpoint.pathToCompare == container.left.pathParts.path
-	        ]
 	        
-	        val givenOperation = container.eContainer as OperationImpl
-	        val wantedScope = endpoint.operations.findFirst[operation |
+	        val endpoint = container.left.microservice.declarations.filter(Endpoint).findFirst[pathToCompare == container.left.pathParts.path]
+	        
+	        val inheritedEndpoints = new ArrayList<Endpoint>()
+	        container.left.microservice.declarations.filter(Implements).forEach[resolve]
+	        for (Implements implement : container.left.microservice.implements) {
+	        	
+	        	val foundEndpoint = implement.inheritedEndpoints.findFirst[pathToCompare == container.left.pathParts.path]
+	        	if (foundEndpoint !== null) inheritedEndpoints.add(foundEndpoint)
+	        }
+	        
+	        val givenOperation = container.eContainer as OperationImpl	        
+	       	val root = givenOperation.eContainer as EndpointImpl
+	        val currentScopeCandidates = EcoreUtil2.getAllContentsOfType(root, TypedParameter)
+	        
+	        if(endpoint !== null) {
+	        	val wantedScope = endpoint.operations.findFirst[operation |
 	        	operation.method.name == givenOperation.method.name
-	        ]
-	       
-	        val candidates = EcoreUtil2.getAllContentsOfType(wantedScope, TypedParameter)
-	        return Scopes.scopeFor(candidates)
+	        	]
+	        	val referenceCandidates = EcoreUtil2.getAllContentsOfType(wantedScope, TypedParameter)
+	        	currentScopeCandidates.addAll(referenceCandidates)
+	        }
+	        if(!inheritedEndpoints.empty) {
+	        	for(Endpoint inheritedEndpoint : inheritedEndpoints) {
+	        		var wantedInScope = inheritedEndpoint.operations.findFirst[operation |
+	        			operation.method.name == givenOperation.method.name
+	        		]
+	        		val referenceCandidates = EcoreUtil2.getAllContentsOfType(wantedInScope, TypedParameter)
+	        		currentScopeCandidates.addAll(referenceCandidates)
+	        	}
+	        }
+		        
+	  		return Scopes.scopeFor(currentScopeCandidates)
     	}
 		super.getScope(context, reference)
 	}

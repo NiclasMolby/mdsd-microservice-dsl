@@ -1,5 +1,7 @@
 package dk.sdu.mdsd.micro_lang
 
+import static org.eclipse.emf.ecore.util.EcoreUtil.UsageCrossReferencer.find
+
 import dk.sdu.mdsd.micro_lang.microLang.COp
 import dk.sdu.mdsd.micro_lang.microLang.Div
 import dk.sdu.mdsd.micro_lang.microLang.Element
@@ -29,6 +31,9 @@ import java.util.ArrayList
 import java.util.HashSet
 import java.util.List
 import java.util.Set
+import dk.sdu.mdsd.micro_lang.microLang.Type
+import dk.sdu.mdsd.micro_lang.microLang.Method
+import dk.sdu.mdsd.micro_lang.microLang.Argument
 
 /**
  * Extension utility methods for the various classes of the meta-model.
@@ -200,5 +205,33 @@ class MicroLangModelUtil {
 	
 	def exp(LogicAnd logic) {
 		logic.left.right
+	}
+	
+	def void resolve(Implements implement) {
+		val args = implement.arguments.map[name]
+		implement.target.parameters.forEach [ parameter, index |
+			find(parameter, parameter.eContainer).forEach[EObject.resolve(args.get(index))]
+		]
+		implement.target.implements.forEach[resolve]
+	}
+
+	def dispatch resolve(Argument argument, String arg) {
+		argument.name = arg
+	}
+
+	def dispatch resolve(NormalPath path, String arg) {
+		path.name = arg
+	}
+
+	def dispatch resolve(Method method, String arg) {
+		method.name = arg
+	}
+
+	def dispatch resolve(TypedParameter parameter, String arg) {
+		parameter.name = arg
+	}
+
+	def dispatch resolve(Type type, String arg) {
+		type.name = arg
 	}
 }

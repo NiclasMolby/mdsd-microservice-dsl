@@ -6,17 +6,22 @@ package dk.sdu.mdsd.micro_lang.generator
 import com.google.common.base.CaseFormat
 import com.google.inject.Inject
 import dk.sdu.mdsd.micro_lang.MicroLangModelUtil
-import dk.sdu.mdsd.micro_lang.microLang.Argument
+import dk.sdu.mdsd.micro_lang.microLang.Comparison
 import dk.sdu.mdsd.micro_lang.microLang.Endpoint
+import dk.sdu.mdsd.micro_lang.microLang.Gateway
+import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
+import dk.sdu.mdsd.micro_lang.microLang.GatewayGivenPath
+import dk.sdu.mdsd.micro_lang.microLang.Given
 import dk.sdu.mdsd.micro_lang.microLang.Implements
 import dk.sdu.mdsd.micro_lang.microLang.Logic
 import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
-import dk.sdu.mdsd.micro_lang.microLang.Method
-import dk.sdu.mdsd.micro_lang.microLang.NormalPath
+import dk.sdu.mdsd.micro_lang.microLang.Microservice
 import dk.sdu.mdsd.micro_lang.microLang.Operation
 import dk.sdu.mdsd.micro_lang.microLang.Return
 import dk.sdu.mdsd.micro_lang.microLang.Type
 import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
+import dk.sdu.mdsd.micro_lang.microLang.Usable
+import java.util.ArrayList
 import java.util.List
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
@@ -26,12 +31,6 @@ import org.eclipse.xtext.generator.IGeneratorContext
 import static org.eclipse.emf.ecore.util.EcoreUtil.UsageCrossReferencer.find
 
 import static extension dk.sdu.mdsd.micro_lang.generator.NameAndPackage.operator_mappedTo
-import dk.sdu.mdsd.micro_lang.microLang.Usable
-import dk.sdu.mdsd.micro_lang.microLang.Microservice
-import dk.sdu.mdsd.micro_lang.microLang.Gateway
-import dk.sdu.mdsd.micro_lang.microLang.Given
-import dk.sdu.mdsd.micro_lang.microLang.GatewayGivenPath
-import java.util.ArrayList
 
 /**
  * Generates code from your model files on save.
@@ -552,7 +551,7 @@ class MicroLangGenerator extends AbstractGenerator {
 		@Override
 		public «endpoint.generateMethodSignature(gateWayOperations.key)» {
 			«FOR Given given : operation.statements.filter(Given)»
-				«given.generateGatewayCondition(endpoint, gateWayOperations.key, gateWayOperations.value)»
+				«given.generateGatewayGiven(endpoint, gateWayOperations.key, gateWayOperations.value)»
 			«ENDFOR»
 		}
 	'''
@@ -593,7 +592,6 @@ class MicroLangGenerator extends AbstractGenerator {
 		var Operation foundOperation = operation
 		// for (Operation operation : endpoint.operations) {
 		for (Given given : operation.statements.filter(Given)) {
-			given.left.microservice.implements.forEach[resolve]
 			for (Endpoint microserviceEndpoint : given.left.microservice.declarations.filter(Endpoint)) {
 				if (given.left.pathParts.pathToCompare == microserviceEndpoint.path) {
 					for (Operation op : microserviceEndpoint.operations) {
@@ -601,7 +599,8 @@ class MicroLangGenerator extends AbstractGenerator {
 					}
 				}
 			}
-
+			
+			given.left.microservice.implements.forEach[resolve]
 			for (Implements implement : given.left.microservice.implements) {
 				for (Endpoint inheritedEndpoint : implement.inheritedEndpoints) {
 					if (given.left.pathParts.pathToCompare == inheritedEndpoint.path) {
@@ -617,15 +616,6 @@ class MicroLangGenerator extends AbstractGenerator {
 		foundOperation
 	}
 	
-	/* MIGHT BREAK IF REMOVED.
-	def pathToCompare(List<GatewayGivenPath> path) {
-		"/"+path.map[name ?: "{" + target.type.name + "}" ].join("/")
-	}
-	
-	def pathToCompare(Endpoint endpoint) {
-		endpoint.pathParts.mapPaths([name ?: ""], ['{' + parameter + '}'], '/')
-	}*/
-
 	// TODO: Refactor
 	def findGatewayRightOperation(Operation operation) {
 
@@ -656,8 +646,8 @@ class MicroLangGenerator extends AbstractGenerator {
 		foundOperation
 	}
 
-	def generateGatewayCondition(Given given, Endpoint endpoint, Operation operation, Operation rightOperation) '''
-		if («given.condition») {
+	def generateGatewayGiven(Given given, Endpoint endpoint, Operation operation, Operation rightOperation) '''
+		if («given.condition.generateGatewayCondition(endpoint, operation)») {
 			«IF operation.returnType !== null»return «ENDIF»«given.left.microservice.name.toAttributeName».«given.left.pathParts.toMethodName(operation)»«operation.mapGateWayParamToCallMethod(endpoint.parameters(operation), endpoint).generateGatewayArguments»;
 			//«given.left.microservice.name»«given.left.pathParts.path»
 		}
@@ -666,7 +656,30 @@ class MicroLangGenerator extends AbstractGenerator {
 			//«given.right.microservice.name»«given.right.pathParts.path»
 		}
 	'''
-
+	
+	def generateGatewayCondition(GatewayCondition condition, Endpoint endpoint, Operation operation) 
+	'''«IF condition.parameter !== null»«condition.generateGatewayConditionParameter»«ELSE»«condition.generateGatewayConditionEndpoint(endpoint, operation)»«ENDIF»'''
+	
+	def generateGatewayConditionParameter(GatewayCondition condition) 
+	'''«condition.parameter.name»«condition.generateGatewayConditionEndpointComparison»'''
+	
+	def generateGatewayConditionEndpoint(GatewayCondition condition, Endpoint endpoint, Operation operation) 
+	'''«condition.endpoint.microservice.name.toAttributeName».«condition.endpoint.pathParts.toMethodName(operation)»«operation.mapGateWayParamToCallMethod(endpoint.parameters(operation), endpoint).generateGatewayArguments»«condition.generateGatewayConditionEndpointComparison»'''
+	
+	def generateGatewayConditionEndpointComparison(GatewayCondition condition) {
+		if (condition.op !== null){
+			if (condition.comparison.stringValue !== null) {
+				'''.equals(«condition.comparison.generateComparison»)'''
+			} 
+			else {
+				''' «condition.op.operator» «condition.comparison.generateComparison»'''	
+			}
+		} 
+	}
+	
+	def generateComparison(Comparison comparison)
+	'''«IF comparison.stringValue !== null»"«comparison.stringValue»"«ELSE»«comparison.intValue»«ENDIF»'''
+	
 	def mapGateWayParamToCallMethod(Operation givenOperation, Iterable<TypedParameter> requiredArguments, Endpoint endpoint) {
 		var List<String> returnArgs = new ArrayList()
 		for (TypedParameter requiredArgument : requiredArguments) {
@@ -676,7 +689,6 @@ class MicroLangGenerator extends AbstractGenerator {
 				returnArgs.add(requiredArgument.type.name)
 			}
 		}
-
 		returnArgs
 	}
 
@@ -716,34 +728,6 @@ class MicroLangGenerator extends AbstractGenerator {
 		val operationName = operation.method.name.toLowerCase
 		pathName = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, pathName)
 		operationName + pathName
-	}
-
-	def void resolve(Implements implement) {
-		val args = implement.arguments.map[name]
-		implement.target.parameters.forEach [ parameter, index |
-			find(parameter, parameter.eContainer).forEach[EObject.resolve(args.get(index))]
-		]
-		implement.target.implements.forEach[resolve]
-	}
-
-	def dispatch resolve(Argument argument, String arg) {
-		argument.name = arg
-	}
-
-	def dispatch resolve(NormalPath path, String arg) {
-		path.name = arg
-	}
-
-	def dispatch resolve(Method method, String arg) {
-		method.name = arg
-	}
-
-	def dispatch resolve(TypedParameter parameter, String arg) {
-		parameter.name = arg
-	}
-
-	def dispatch resolve(Type type, String arg) {
-		type.name = arg
 	}
 
 	def generateHeader() '''
