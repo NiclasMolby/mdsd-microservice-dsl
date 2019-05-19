@@ -33,13 +33,13 @@ class MicroLangScopeProvider extends AbstractMicroLangScopeProvider {
 		if (context instanceof GatewayCondition && reference == MicroLangPackage.Literals.GATEWAY_CONDITION__PARAMETER) {
 	        val container = context.eContainer as GivenImpl
 	        
-	        val endpoint = container.left.microservice.declarations.filter(Endpoint).findFirst[pathToCompare == container.left.pathParts.path]
+	        val endpoint = container.left.microservice.declarations.filter(Endpoint).findFirst[path == container.left.pathParts.pathToCompare]
 	        
 	        val inheritedEndpoints = new ArrayList<Endpoint>()
 	        container.left.microservice.declarations.filter(Implements).forEach[resolve]
 	        for (Implements implement : container.left.microservice.implements) {
 	        	
-	        	val foundEndpoint = implement.inheritedEndpoints.findFirst[pathToCompare == container.left.pathParts.path]
+	        	val foundEndpoint = implement.inheritedEndpoints.findFirst[path == container.left.pathParts.pathToCompare]
 	        	if (foundEndpoint !== null) inheritedEndpoints.add(foundEndpoint)
 	        }
 	        

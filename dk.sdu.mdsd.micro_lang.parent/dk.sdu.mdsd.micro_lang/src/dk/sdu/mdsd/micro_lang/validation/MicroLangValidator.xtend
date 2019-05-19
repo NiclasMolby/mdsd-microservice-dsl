@@ -21,6 +21,8 @@ import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.validation.Check
 
 import static org.eclipse.emf.ecore.util.EcoreUtil.UsageCrossReferencer.find
+import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
+import dk.sdu.mdsd.micro_lang.microLang.Given
 
 /**
  * This class contains custom validation rules. 
@@ -51,10 +53,255 @@ class MicroLangValidator extends AbstractMicroLangValidator {
 	
 	public static val GIVEN_ON_NON_GATEWAY_ELEMENT = ISSUE_CODE_PREFIX + 'GivenOnNonGatewayElement'
 	
+	public static val GIVEN_CONDITION_NO_OPERATOR = ISSUE_CODE_PREFIX + 'GivenConditionNoOperator'
+	
+	public static val GIVEN_CONDITION_REFERENCE_NO_RETURN_TYPE = ISSUE_CODE_PREFIX + 'GivenConditionReferenceNoReturnType'
+	
+	public static val GIVEN_CONDITION_REFERENCE_NO_OPERATOR = ISSUE_CODE_PREFIX + 'GivenConditionReferenceNoOperator'
+	
+	public static val GIVEN_CONDITION_WRONG_OPERATOR = ISSUE_CODE_PREFIX + 'GivenConditionWrongOperator'
+	
+	public static val GIVEN_CONDITION_WRONG_OPERATOR_REFERENCE = ISSUE_CODE_PREFIX + 'GivenConditionWrongOperatorReference'
+	
+	public static val GIVEN_CONDITION_REFERED_METHOD_NOT_FOUND = ISSUE_CODE_PREFIX + 'GivenConditionReferedMethodNotFound'
+	
+	public static val GIVEN_CONDITION_REFERED_METHOD_NOT_GET = ISSUE_CODE_PREFIX + 'GivenConditionReferedMethodNotGET'
+	
+	public static val GIVEN_CONDITION_REQUIED_ARG_CANNOT_BE_PARSED = ISSUE_CODE_PREFIX + 'GivenConditionRequiredArgCannotBeParsed'
+	
 	val epackage = MicroLangPackage.eINSTANCE
 	
 	@Inject
 	extension MicroLangModelUtil
+	
+	
+	
+	@Check
+	def checkGivenMicroserviceReference(Given given) {
+		val foundLeftEndpoint = given.left.resolveMethodReference(given.eContainer as Operation)
+		val foundRightEndpoint = given.right.resolveMethodReference(given.eContainer as Operation)
+		
+		if (foundLeftEndpoint === null) {
+			error("This endpoint cannot be found.",
+				given,
+				epackage.given_Left,
+				GIVEN_CONDITION_REFERED_METHOD_NOT_FOUND)
+		}
+		
+		if (foundRightEndpoint === null) {
+			error("This endpoint cannot be found.",
+				given,
+				epackage.given_Right,
+				GIVEN_CONDITION_REFERED_METHOD_NOT_FOUND)
+		}
+	}
+	
+	@Check
+	def checkGivenRequireCannotBeParsedOn(Given given) {
+		val foundLeftEndpoint = given.left.resolveMethodReference(given.eContainer as Operation)
+		val foundRightEndpoint = given.right.resolveMethodReference(given.eContainer as Operation)
+		
+		val leftParams = foundLeftEndpoint.statements.filter(TypedParameter)
+		val rightParams = foundRightEndpoint.statements.filter(TypedParameter)
+		rightParams.forEach[rightParam |
+			if (rightParam.require !== null) {
+				if(!leftParams.exists[leftParam | rightParam.name == leftParam.name && rightParam.type.name == leftParam.type.name]) {
+					error("The else endpoint contains a required parameter which cannot be found on this endpoint.",
+						given,
+						epackage.given_Left,
+						GIVEN_CONDITION_REQUIED_ARG_CANNOT_BE_PARSED)
+				}
+				if(leftParams.exists[leftParam | rightParam.name == leftParam.name && rightParam.type.name == leftParam.type.name && leftParam.require === null]) {
+					error("The else endpoint contains a required parameter which is not required on this endpoint.",
+						given,
+						epackage.given_Left,
+						GIVEN_CONDITION_REQUIED_ARG_CANNOT_BE_PARSED)
+				}
+			}
+		]
+		
+	}
+	
+	@Check
+	def checkGivenConditionReferedMethodNotGet(GatewayCondition condition) {
+		val microservice = condition.endpoint
+		if (microservice !== null) {
+			val reference = resolveMethodReference(microservice, "GET")
+			if (reference === null) {
+				error("This endpoint must be a GET method.",
+					condition,
+					epackage.gatewayCondition_Endpoint,
+					GIVEN_CONDITION_REFERED_METHOD_NOT_GET)
+			}	
+		}
+	}
+	
+	@Check
+	def checkGivenConditionNoOperator(GatewayCondition condition) {
+		if (condition.parameter !== null && condition.op === null && condition.parameter.type.name != "bool") {
+			error("Must have a comparison condition unless type is boolean",
+				condition,
+				epackage.gatewayCondition_Parameter,
+				GIVEN_CONDITION_NO_OPERATOR)
+		}
+	}
+	
+	@Check
+	def checkGivenConditionNoReturnTypeMicroserviceEndpoint(GatewayCondition condition) {
+		val microservice = condition.endpoint
+		if (microservice !== null) {
+			val reference = resolveMethodReference(microservice, "GET")
+			val returnType = reference.statements.filter(Return)
+			if (returnType.empty) {
+				error("Microservice endpoint reference must have a return type",
+					condition.eContainer,
+					epackage.given_Condition,
+					GIVEN_CONDITION_REFERENCE_NO_RETURN_TYPE)
+			}
+		}
+	}
+	
+	@Check
+	def checkGivenConditionEqualReturnTypes(Given given) {
+		val foundLeftEndpoint = given.left.resolveMethodReference(given.eContainer as Operation)
+		val foundRightEndpoint = given.right.resolveMethodReference(given.eContainer as Operation)
+		
+		val leftReturn = foundLeftEndpoint.statements.filter(Return)
+		val rightReturn = foundRightEndpoint.statements.filter(Return)
+		
+		if (!leftReturn.empty) {
+			if (rightReturn.empty) {
+				error("This endpoint must have a return type, as the other endpoint does.",
+					given,
+					epackage.given_Right,
+					GIVEN_CONDITION_REFERENCE_NO_RETURN_TYPE)
+			} else {
+				if (leftReturn.head.type.name != rightReturn.head.type.name) {
+					error("This endpoint must have the same return type as the other endpoint.",
+						given,
+						epackage.given_Right,
+						GIVEN_CONDITION_REFERENCE_NO_RETURN_TYPE)
+				}
+			}
+			
+		} else {
+			if (!rightReturn.empty) {
+				warning("This endpoints return value is not used.",
+						given,
+						epackage.given_Right,
+						GIVEN_CONDITION_REFERENCE_NO_RETURN_TYPE)
+			}
+		}
+	}
+	
+	@Check
+	def checkGivenConditionNoOperatorMicroserviceEndpoint(GatewayCondition condition) {
+		val microservice = condition.endpoint
+		if (microservice !== null) {
+			val reference = resolveMethodReference(microservice, "GET")
+			val returnType = reference.statements.filter(Return)
+			if (!returnType.empty) {
+				if (condition.op === null && returnType.head.type.name != "bool") {
+					error("Must have a comparison condition unless type is boolean",
+						condition,
+						epackage.gatewayCondition_Parameter,
+						GIVEN_CONDITION_REFERENCE_NO_OPERATOR)
+				}
+			}
+		}
+	}
+	
+	@Check
+	def checkGivenConditionWrongOperator(GatewayCondition condition) {
+		if (condition.parameter !== null && condition.op !== null && condition.parameter.type.name == "string" && !condition.op.eq) {
+			error("A string can only be compared using '='.",
+				condition.eContainer,
+				epackage.given_Condition,
+				GIVEN_CONDITION_WRONG_OPERATOR)
+		}
+		if (condition.parameter !== null && condition.op !== null && condition.parameter.type.name == "bool") {
+			error("A boolean should not be compared to anything, as it is already a condition.",
+				condition.eContainer,
+				epackage.given_Condition,
+				GIVEN_CONDITION_WRONG_OPERATOR)
+		}
+	}
+	
+	@Check
+	def checkGivenConditionWrongOperatorReference(GatewayCondition condition) {
+		val microservice = condition.endpoint
+		if (microservice !== null) {
+			val reference = resolveMethodReference(microservice, "GET")
+			val returnType = reference.statements.filter(Return)
+			if (!returnType.empty) {
+				if (condition.op !== null && returnType.head.type.name == "string" && !condition.op.eq) {
+					error("A string can only be compared using '='.",
+						condition.eContainer,
+						epackage.given_Condition,
+						GIVEN_CONDITION_WRONG_OPERATOR_REFERENCE)
+				}
+				if (condition.op !== null && returnType.head.type.name == "bool") {
+					error("A boolean should not be compared to anything, as it is already a condition.",
+						condition.eContainer,
+						epackage.given_Condition,
+						GIVEN_CONDITION_WRONG_OPERATOR_REFERENCE)
+				}
+			}
+		}
+	}
+	
+	@Check
+	def checkGivenConditionWrongTypeComparison(GatewayCondition condition) {
+		if (condition.parameter !== null && condition.op !== null && condition.parameter.type.name == "string" && condition.comparison.stringValue === null) {
+			error("A string can only be compared to another string.",
+				condition.eContainer,
+				epackage.given_Condition,
+				GIVEN_CONDITION_WRONG_OPERATOR)
+		}
+		
+		if (condition.parameter !== null && condition.op !== null && condition.parameter.type.name == "int" && condition.comparison.stringValue !== null) {
+			error("A int can only be compared to another int.",
+				condition.eContainer,
+				epackage.given_Condition,
+				GIVEN_CONDITION_WRONG_OPERATOR)
+		}
+		
+		if (condition.parameter !== null && condition.op !== null && condition.parameter.type.name == "double" && condition.comparison.stringValue !== null) {
+			error("A double can only be compared to a int.",
+				condition.eContainer,
+				epackage.given_Condition,
+				GIVEN_CONDITION_WRONG_OPERATOR)
+		}
+	}
+	
+	@Check
+	def checkGivenConditionWrongTypeComparisonReference(GatewayCondition condition) {
+		val microservice = condition.endpoint
+		if (microservice !== null) {
+			val reference = resolveMethodReference(microservice, "GET")
+			val returnType = reference.statements.filter(Return)
+			if (!returnType.empty) {
+				if (condition.op !== null && returnType.head.type.name == "string" && condition.comparison.stringValue === null) {
+					error("A string can only be compared to another string.",
+						condition.eContainer,
+						epackage.given_Condition,
+						GIVEN_CONDITION_WRONG_OPERATOR_REFERENCE)
+				}
+				if (condition.op !== null && returnType.head.type.name == "int" && condition.comparison.stringValue !== null) {
+					error("A int can only be compared to another int.",
+						condition.eContainer,
+						epackage.given_Condition,
+						GIVEN_CONDITION_WRONG_OPERATOR_REFERENCE)
+				}
+				if (condition.op !== null && returnType.head.type.name == "double" && condition.comparison.stringValue !== null) {
+					error("A double can only be compared to another int.",
+						condition.eContainer,
+						epackage.given_Condition,
+						GIVEN_CONDITION_WRONG_OPERATOR_REFERENCE)
+				}
+			}
+		}
+	}
 	
 	@Check
 	def checkGivenOnElement(Operation operation) {

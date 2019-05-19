@@ -34,6 +34,7 @@ import java.util.Set
 import dk.sdu.mdsd.micro_lang.microLang.Type
 import dk.sdu.mdsd.micro_lang.microLang.Method
 import dk.sdu.mdsd.micro_lang.microLang.Argument
+import dk.sdu.mdsd.micro_lang.microLang.MicroserviceEndpoint
 
 /**
  * Extension utility methods for the various classes of the meta-model.
@@ -87,6 +88,10 @@ class MicroLangModelUtil {
 	
 	def parameters(Endpoint endpoint, Operation operation) {
 		endpoint.parameterPaths.map[parameter] + operation.parameters
+	}
+	
+	def parameters(List<GatewayGivenPath> paths, Operation operation) {
+		paths.filter[target !== null].map[target] + operation.parameters
 	}
 	
 	def returnTypes(Operation operation) {
@@ -176,6 +181,34 @@ class MicroLangModelUtil {
 			case op.lte: '<='
 			case op.eq: '=='
 		}
+	}
+	
+	def resolveMethodReference(MicroserviceEndpoint microserviceEndpoint, Operation method) {
+		resolveMethodReference(microserviceEndpoint, method.method.name)
+	}
+	def resolveMethodReference(MicroserviceEndpoint microserviceEndpoint, String method) {
+		val endpoint = microserviceEndpoint.microservice.declarations.filter(Endpoint).findFirst[path == microserviceEndpoint.pathParts.pathToCompare]
+		var Operation foundOperation = null
+		
+		if (endpoint !== null)  {
+			foundOperation = endpoint.operations.findFirst[operation | operation.method.name == method]
+		}
+		
+		val inheritedEndpoints = new ArrayList<Endpoint>()
+        microserviceEndpoint.microservice.declarations.filter(Implements).forEach[resolve]
+        for (Implements implement : microserviceEndpoint.microservice.implements) {
+        	val foundEndpoint = implement.inheritedEndpoints.findFirst[path == microserviceEndpoint.pathParts.pathToCompare]
+        	if (foundEndpoint !== null) inheritedEndpoints.add(foundEndpoint)
+        }
+        
+        if(!inheritedEndpoints.empty) {
+        	for(Endpoint inheritedEndpoint : inheritedEndpoints) {
+        		foundOperation = inheritedEndpoint.operations.findFirst[operation |
+        			operation.method.name == method
+        		] ?: foundOperation
+        	}
+        }
+        foundOperation
 	}
 	
 	def resolve(Exp exp) {

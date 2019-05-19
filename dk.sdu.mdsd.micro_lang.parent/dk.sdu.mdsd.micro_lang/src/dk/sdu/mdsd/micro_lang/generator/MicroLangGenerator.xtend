@@ -648,11 +648,11 @@ class MicroLangGenerator extends AbstractGenerator {
 
 	def generateGatewayGiven(Given given, Endpoint endpoint, Operation operation, Operation rightOperation) '''
 		if («given.condition.generateGatewayCondition(endpoint, operation)») {
-			«IF operation.returnType !== null»return «ENDIF»«given.left.microservice.name.toAttributeName».«given.left.pathParts.toMethodName(operation)»«operation.mapGateWayParamToCallMethod(endpoint.parameters(operation), endpoint).generateGatewayArguments»;
+			«IF operation.returnType !== null»return «ENDIF»«given.left.microservice.name.toAttributeName».«given.left.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(given.left.pathParts.parameters(operation), endpoint).generateGatewayArguments»;
 			//«given.left.microservice.name»«given.left.pathParts.path»
 		}
 		else {
-			«IF operation.returnType !== null»return «ENDIF»«given.right.microservice.name.toAttributeName».«given.right.pathParts.toMethodName(operation)»«operation.mapGateWayParamToCallMethod(endpoint.parameters(rightOperation), endpoint).generateGatewayArguments»;
+			«IF operation.returnType !== null»return «ENDIF»«given.right.microservice.name.toAttributeName».«given.right.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(given.right.pathParts.parameters(rightOperation), endpoint).generateGatewayArguments»;
 			//«given.right.microservice.name»«given.right.pathParts.path»
 		}
 	'''
@@ -664,7 +664,7 @@ class MicroLangGenerator extends AbstractGenerator {
 	'''«condition.parameter.name»«condition.generateGatewayConditionEndpointComparison»'''
 	
 	def generateGatewayConditionEndpoint(GatewayCondition condition, Endpoint endpoint, Operation operation) 
-	'''«condition.endpoint.microservice.name.toAttributeName».«condition.endpoint.pathParts.toMethodName(operation)»«operation.mapGateWayParamToCallMethod(endpoint.parameters(operation), endpoint).generateGatewayArguments»«condition.generateGatewayConditionEndpointComparison»'''
+	'''«condition.endpoint.microservice.name.toAttributeName».«condition.endpoint.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(endpoint.parameters(operation), endpoint).generateGatewayArguments»«condition.generateGatewayConditionEndpointComparison»'''
 	
 	def generateGatewayConditionEndpointComparison(GatewayCondition condition) {
 		if (condition.op !== null){
@@ -680,7 +680,7 @@ class MicroLangGenerator extends AbstractGenerator {
 	def generateComparison(Comparison comparison)
 	'''«IF comparison.stringValue !== null»"«comparison.stringValue»"«ELSE»«comparison.intValue»«ENDIF»'''
 	
-	def mapGateWayParamToCallMethod(Operation givenOperation, Iterable<TypedParameter> requiredArguments, Endpoint endpoint) {
+	def mapGatewayParamToCallMethod(Operation givenOperation, Iterable<TypedParameter> requiredArguments, Endpoint endpoint) {
 		var List<String> returnArgs = new ArrayList()
 		for (TypedParameter requiredArgument : requiredArguments) {
 			if (endpoint.parameters(givenOperation).exists[givenArgument|givenArgument.name == requiredArgument.name])
