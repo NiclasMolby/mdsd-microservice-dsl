@@ -9,6 +9,8 @@ import dk.sdu.mdsd.micro_lang.MicroLangModelUtil
 import dk.sdu.mdsd.micro_lang.microLang.Argument
 import dk.sdu.mdsd.micro_lang.microLang.Endpoint
 import dk.sdu.mdsd.micro_lang.microLang.Implements
+import dk.sdu.mdsd.micro_lang.microLang.Logic
+import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
 import dk.sdu.mdsd.micro_lang.microLang.Method
 import dk.sdu.mdsd.micro_lang.microLang.Microservice
 import dk.sdu.mdsd.micro_lang.microLang.NormalPath
@@ -246,6 +248,7 @@ class MicroLangGenerator extends AbstractGenerator {
 				«ENDFOR»
 				default:
 					util.sendResponse(exchange, 405, method + " is not implemented on " + path);
+					return;
 			}
 		}
 	'''
@@ -266,9 +269,11 @@ class MicroLangGenerator extends AbstractGenerator {
 	def generateMethodInvocation(Endpoint endpoint, Operation operation)'''
 		«FOR entry : endpoint.mapParametersToIndex.entrySet»
 			«entry.key.generateVariableAssignment('''path.split("/")[«entry.value»]''')»
+			«IF entry.key.isRequired»«entry.key.generateRequireLogic»«ENDIF»
 		«ENDFOR»
 		«FOR param : operation.parameters»
-			«param.generateVariableAssignment('''parameters.get("«param.name»")''')»
+			«param.type.generateType» «param.name» = parameters.get("«param.name»") != null ? «param.type.generateTypeCast('''parameters.get("«param.name»")''')» : «param.type.generateInitialTypeValue»;
+			«param.generateRequire»
 		«ENDFOR»
 		«IF operation.hasReturn»Object response = «ENDIF»«endpoint.toMethodName(operation)»«(endpoint.mapParametersToIndex.keySet + operation.parameters).generateArguments»;
 		util.sendResponse(exchange, 200«IF operation.hasReturn», response«ENDIF»);
@@ -300,6 +305,59 @@ class MicroLangGenerator extends AbstractGenerator {
 		'''«returnType.type.generateType»'''
 	}
 	
+	def generateRequire(TypedParameter param) {
+		if(param.isRequired) {
+			'''
+			if (parameters.get("«param.name»") == null) {
+				util.sendResponse(exchange, 400, "Parameter «param.name» is required");
+				return;
+			}
+			«param.generateRequireLogic»
+			'''
+		}
+	}
+	
+	def generateRequireLogic(TypedParameter param) {
+		if(param.require.logic !== null) {
+			System.out.println(param.require.logic.generateLogicCondition(param))
+			'''
+			if («param.require.logic.generateLogicCondition(param)») {
+				util.sendResponse(exchange, 400, "Parameter must hold required conditions");
+				return;
+			}
+			'''
+		}
+	}
+	
+	def String generateLogicCondition(Logic logic, TypedParameter param) {
+		val builder = new StringBuilder()
+		
+		builder.append(logic.left.generateLogicCondition(param))
+		if(logic.right !== null) {
+			builder.append(" || ")
+			builder.append(logic.right.generateLogicCondition(param))
+		}
+		
+		builder.toString
+	}
+	
+	def String generateLogicCondition(LogicAnd logic, TypedParameter param) {
+		val builder = new StringBuilder()
+		
+		builder.append('''!(«param.generateRequireAttributeMethodCall(logic.left.left.attribute)» «logic.left.op.operator» «logic.left.right.resolve»)''')
+
+		if(logic.right !== null) {
+			builder.append(" && ")
+			builder.append(logic.right.generateLogicCondition(param))
+		}
+		
+		builder.toString
+	}
+	
+	def isRequired(TypedParameter param) {
+		param.require !== null
+	}
+	
 	def generateType(Type type) {
 		switch type.name {
 			case "string": "String"
@@ -315,6 +373,29 @@ class MicroLangGenerator extends AbstractGenerator {
 			default: type.name
 		}
 		name.toFirstUpper
+	}
+	
+	def generateInitialTypeValue(Type type) {
+		switch type.name {
+			case "int": "0"
+			case "double": "0"
+			case "bool": "false"
+			default: "null"
+		}
+	}
+	
+	def generateRequireAttributeMethodCall(TypedParameter param, String attribute) {
+		switch param.type.name {
+			case "string": 
+				switch attribute {
+					case "length": '''«param.name».length()'''
+				}
+			case "int",
+			case "double":
+				switch attribute {
+					case "value": param.name 
+				}
+		}
 	}
 	
 	def generateStubMethod(Endpoint endpoint, Operation operation)'''

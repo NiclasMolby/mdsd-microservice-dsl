@@ -24,7 +24,7 @@ Template:
 ;
 
 Microservice:
-	'microservice' name=ID location=Location
+	'microservice' name=ID location=Location (auth?=Auth)?
 	(BEGIN
 		declarations+=Declaration*
 	END)*
@@ -61,12 +61,16 @@ PathPart:
 	NormalPath | ParameterPath
 ;
 
+Auth:
+	{Auth} 'auth'
+;
+
 NormalPath:
-	{NormalPath} '/' (name=ID | '{' target=[Parameter] '}')?
+	{NormalPath} '/' (name=ID | '{' target=[Parameter] '}')? (auth?=Auth)?
 ;
 
 ParameterPath:
-	'/' '{' parameter=TypedParameter '}'
+	'/' '{' parameter=TypedParameter '}' (auth?=Auth)?
 ;
 
 Operation:
@@ -81,7 +85,7 @@ Method:
 ;
 
 Statement:
-	TypedParameter | Require | Return
+	TypedParameter | Return
 ;
 
 Parameter:
@@ -89,11 +93,59 @@ Parameter:
 ;
 
 TypedParameter:
-	type=Type (name=ID | '{' target=[Parameter] '}')
+	type=Type (name=ID | '{' target=[Parameter] '}') (require=Require)?
 ;
 
 Require:
-	{Require} 'require'
+	{Require} 'require' (logic=Logic)?
+;
+
+Logic:
+	left=LogicAnd ('||' right=Logic)?
+;
+
+LogicAnd:
+	left=Compare ('&&' right=LogicAnd)?
+;
+
+ExternOrCompare:
+	/*Extern | */Compare
+;
+
+Extern:
+	call=[TypedParameter] '(' exps+=Exp (',' exps+=Exp)* ')'
+;
+
+Compare:
+	left=Attribute op=COp right=Exp
+;
+
+Attribute:
+	attribute=('length' | 'value')
+;
+
+COp:
+	lt?='<' | gt?='>' | eq?='=' | lte?='<=' | gte?='>='
+;
+
+Exp:
+	Factor (({Plus.left=current} '+' | {Minus.left=current} '-') right=Factor)* 
+;
+
+Factor:
+	Prim (({Mult.left=current} '*' | {Div.left=current} '/') right=Prim)?
+;
+
+Prim:
+	Number /*| Variable */| '(' exp=Exp ')'
+;
+
+Variable:
+	var=[Require]
+;
+
+Number:
+	value=INT
 ;
 
 Return:

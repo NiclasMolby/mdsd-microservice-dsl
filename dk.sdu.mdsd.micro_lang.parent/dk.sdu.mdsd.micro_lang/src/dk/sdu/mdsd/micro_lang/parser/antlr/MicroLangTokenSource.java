@@ -3,10 +3,11 @@
  */
 package dk.sdu.mdsd.micro_lang.parser.antlr;
 
-import dk.sdu.mdsd.micro_lang.parser.antlr.internal.InternalMicroLangParser;
 import org.antlr.runtime.Token;
 import org.antlr.runtime.TokenSource;
 import org.eclipse.xtext.parser.antlr.AbstractIndentationTokenSource;
+
+import dk.sdu.mdsd.micro_lang.parser.antlr.internal.InternalMicroLangParser;
 
 public class MicroLangTokenSource extends AbstractIndentationTokenSource {
 

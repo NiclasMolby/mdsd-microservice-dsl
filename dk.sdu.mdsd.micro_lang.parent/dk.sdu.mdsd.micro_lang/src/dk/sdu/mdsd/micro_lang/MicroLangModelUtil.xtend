@@ -1,17 +1,29 @@
 package dk.sdu.mdsd.micro_lang
 
+import dk.sdu.mdsd.micro_lang.microLang.COp
+import dk.sdu.mdsd.micro_lang.microLang.Div
 import dk.sdu.mdsd.micro_lang.microLang.Element
 import dk.sdu.mdsd.micro_lang.microLang.Endpoint
+import dk.sdu.mdsd.micro_lang.microLang.Exp
 import dk.sdu.mdsd.micro_lang.microLang.Implements
+import dk.sdu.mdsd.micro_lang.microLang.Logic
+import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
 import dk.sdu.mdsd.micro_lang.microLang.Microservice
+import dk.sdu.mdsd.micro_lang.microLang.Minus
 import dk.sdu.mdsd.micro_lang.microLang.Model
+import dk.sdu.mdsd.micro_lang.microLang.Mult
 import dk.sdu.mdsd.micro_lang.microLang.NormalPath
+import dk.sdu.mdsd.micro_lang.microLang.Number
 import dk.sdu.mdsd.micro_lang.microLang.Operation
 import dk.sdu.mdsd.micro_lang.microLang.ParameterPath
+import dk.sdu.mdsd.micro_lang.microLang.Plus
 import dk.sdu.mdsd.micro_lang.microLang.Return
 import dk.sdu.mdsd.micro_lang.microLang.Template
 import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
 import dk.sdu.mdsd.micro_lang.microLang.Uses
+import java.util.ArrayList
+import java.util.List
+import java.util.Set
 
 /**
  * Extension utility methods for the various classes of the meta-model.
@@ -88,4 +100,67 @@ class MicroLangModelUtil {
 		endpoint.mapPaths([name ?: ""], ['{' + parameter.type.name + '}'], '/')
 	}
 	
+	def dispatch List<String> attributes(Logic logic) {
+		val attributes = new ArrayList<String>()
+		attributes.addAll(logic.left.attributes)
+		if(logic.right !== null) {
+			attributes.addAll(logic.right.attributes)
+		}
+		attributes
+	}
+	
+	def dispatch List<String> attributes(LogicAnd logic) {
+		val attributesList = new ArrayList<String>()
+		attributesList.add(logic.left.left.attribute)
+		if(logic.right !== null) {
+			attributesList.addAll(logic.right.attributes)
+		}
+		
+		attributesList
+	}
+	
+	def printSet(Set<String> list) {
+		val builder = new StringBuilder()
+		list.forEach[item, index | 
+			if (index > 0) {
+				builder.append(", ")
+			}
+			builder.append(item)
+		]
+		builder.toString
+	}
+	
+	def operator(COp op) {
+		switch op {
+			case op.lt: '<'
+			case op.gt: '>'
+			case op.gte: '>='
+			case op.lte: '<='
+			case op.eq: '=='
+		}
+	}
+	
+	def resolve(Exp exp) {
+		exp.comp
+	}
+	
+	def dispatch int comp(Plus plus) {
+		plus.left.comp + plus.right.comp
+	}
+	
+	def dispatch int comp(Minus minus) {
+		minus.left.comp - minus.right.comp
+	}
+	
+	def dispatch int comp(Mult mult) {
+		mult.left.comp * mult.right.comp
+	}
+	
+	def dispatch int comp(Div div) {
+		div.left.comp / div.right.comp
+	}
+	
+	def dispatch int comp(Number num) {
+		num.value
+	}
 }
