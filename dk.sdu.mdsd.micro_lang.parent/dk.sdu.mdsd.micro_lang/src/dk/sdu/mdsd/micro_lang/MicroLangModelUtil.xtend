@@ -186,6 +186,7 @@ class MicroLangModelUtil {
 	def resolveMethodReference(MicroserviceEndpoint microserviceEndpoint, Operation method) {
 		resolveMethodReference(microserviceEndpoint, method.method.name)
 	}
+	
 	def resolveMethodReference(MicroserviceEndpoint microserviceEndpoint, String method) {
 		val endpoint = microserviceEndpoint.microservice.declarations.filter(Endpoint).findFirst[path == microserviceEndpoint.pathParts.pathToCompare]
 		var Operation foundOperation = null
