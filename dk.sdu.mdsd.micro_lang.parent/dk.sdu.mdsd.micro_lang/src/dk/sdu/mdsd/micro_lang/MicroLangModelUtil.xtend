@@ -183,6 +183,16 @@ class MicroLangModelUtil {
 		}
 	}
 	
+	def firstGiven(Operation operation) {
+		operation.statements.filter(Given).head
+	}
+	
+	def resolveMethodReference(Operation operation) {
+		if (operation.statements.filter(Given).head === null)
+			operation
+		else  operation.statements.filter(Given).head
+	}
+	
 	def resolveMethodReference(MicroserviceEndpoint microserviceEndpoint, Operation method) {
 		resolveMethodReference(microserviceEndpoint, method.method.name)
 	}

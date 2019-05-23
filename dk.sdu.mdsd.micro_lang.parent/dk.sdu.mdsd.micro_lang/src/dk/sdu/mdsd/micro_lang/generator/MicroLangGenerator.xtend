@@ -12,7 +12,6 @@ import dk.sdu.mdsd.micro_lang.microLang.Gateway
 import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
 import dk.sdu.mdsd.micro_lang.microLang.GatewayGivenPath
 import dk.sdu.mdsd.micro_lang.microLang.Given
-import dk.sdu.mdsd.micro_lang.microLang.Implements
 import dk.sdu.mdsd.micro_lang.microLang.Logic
 import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
 import dk.sdu.mdsd.micro_lang.microLang.Microservice
@@ -586,64 +585,20 @@ class MicroLangGenerator extends AbstractGenerator {
 		operation.findGatewayLeftOperation -> operation.findGatewayRightOperation
 	}
 
-	// TODO: Refactor
 	def findGatewayLeftOperation(Operation operation) {
-
 		var Operation foundOperation = operation
-		// for (Operation operation : endpoint.operations) {
-		for (Given given : operation.statements.filter(Given)) {
-			for (Endpoint microserviceEndpoint : given.left.microservice.declarations.filter(Endpoint)) {
-				if (given.left.pathParts.pathToCompare == microserviceEndpoint.path) {
-					for (Operation op : microserviceEndpoint.operations) {
-						if(op.method.name == operation.method.name) foundOperation = op
-					}
-				}
-			}
-			
-			given.left.microservice.implements.forEach[resolve]
-			for (Implements implement : given.left.microservice.implements) {
-				for (Endpoint inheritedEndpoint : implement.inheritedEndpoints) {
-					if (given.left.pathParts.pathToCompare == inheritedEndpoint.path) {
-						for (Operation op : inheritedEndpoint.operations) {
-							if(op.method.name == operation.method.name) foundOperation = op
-						}
-					}
-				}
-			}
-
-		// }
-		}
-		foundOperation
+		if (operation.firstGiven === null)
+			foundOperation
+		else 
+			operation.firstGiven.left.resolveMethodReference(operation)
 	}
 	
-	// TODO: Refactor
 	def findGatewayRightOperation(Operation operation) {
-
-		var Operation foundOperation = null
-		// for (Operation operation : endpoint.operations) {
-		for (Given given : operation.statements.filter(Given)) {
-			given.right.microservice.implements.forEach[resolve]
-			for (Endpoint microserviceEndpoint : given.right.microservice.declarations.filter(Endpoint)) {
-				if (given.right.pathParts.pathToCompare == microserviceEndpoint.path) {
-					for (Operation op : microserviceEndpoint.operations) {
-						if(op.method.name == operation.method.name) foundOperation = op
-					}
-				}
-			}
-
-			for (Implements implement : given.right.microservice.implements) {
-				for (Endpoint inheritedEndpoint : implement.inheritedEndpoints) {
-					if (given.right.pathParts.pathToCompare == inheritedEndpoint.path) {
-						for (Operation op : inheritedEndpoint.operations) {
-							if(op.method.name == operation.method.name) foundOperation = op
-						}
-					}
-				}
-			}
-
-		// }
-		}
-		foundOperation
+		var Operation foundOperation = operation
+		if (operation.firstGiven === null)
+			foundOperation
+		else 
+			operation.firstGiven.right.resolveMethodReference(operation)
 	}
 
 	def generateGatewayGiven(Given given, Endpoint endpoint, Operation operation, Operation rightOperation) '''
