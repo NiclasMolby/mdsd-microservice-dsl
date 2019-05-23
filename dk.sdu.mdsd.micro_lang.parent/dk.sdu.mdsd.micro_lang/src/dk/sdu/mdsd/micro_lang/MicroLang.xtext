@@ -13,7 +13,11 @@ terminal END: 'synthetic:END';
 terminal IP returns ecore::EString: INT ('.' INT)+;
 
 Element:
-	Template | Microservice
+	Template | Usable
+;
+
+Usable:
+	Microservice | Gateway
 ;
 
 Template:
@@ -24,7 +28,14 @@ Template:
 ;
 
 Microservice:
-	'microservice' name=ID location=Location (auth?=Auth)?
+	'microservice' name=ID location=Location
+	(BEGIN
+		declarations+=Declaration*
+	END)*
+;
+
+Gateway:
+	'gateway' name=ID location=Location
 	(BEGIN
 		declarations+=Declaration*
 	END)*
@@ -39,7 +50,7 @@ Declaration:
 ;
 
 Uses:
-	'uses' target=[Microservice]
+	'uses' target=[Usable]
 ;
 
 Implements:
@@ -61,16 +72,16 @@ PathPart:
 	NormalPath | ParameterPath
 ;
 
-Auth:
-	{Auth} 'auth'
+NormalPath:
+	{NormalPath} '/' (name=ID | '{' target=[Parameter] '}')?
 ;
 
-NormalPath:
-	{NormalPath} '/' (name=ID | '{' target=[Parameter] '}')? (auth?=Auth)?
+GatewayGivenPath:
+	{GatewayGivenPath} '/' (name=ID | '{' target=[TypedParameter] '}')?
 ;
 
 ParameterPath:
-	'/' '{' parameter=TypedParameter '}' (auth?=Auth)?
+	'/' '{' parameter=TypedParameter '}'
 ;
 
 Operation:
@@ -85,7 +96,7 @@ Method:
 ;
 
 Statement:
-	TypedParameter | Return
+	TypedParameter | Return | Given
 ;
 
 Parameter:
@@ -94,6 +105,22 @@ Parameter:
 
 TypedParameter:
 	type=Type (name=ID | '{' target=[Parameter] '}') (require=Require)?
+;
+
+Given:
+	'given' condition=GatewayCondition left=MicroserviceEndpoint 'else' right=MicroserviceEndpoint
+;
+
+GatewayCondition:
+	(parameter=[TypedParameter] | endpoint=MicroserviceEndpoint) (op=COp comparison=Comparison)?
+;
+
+Comparison:
+	intValue=INT | stringValue=STRING
+;
+
+MicroserviceEndpoint:
+	microservice=[Microservice] pathParts+=GatewayGivenPath+
 ;
 
 Require:
@@ -106,14 +133,6 @@ Logic:
 
 LogicAnd:
 	left=Compare ('&&' right=LogicAnd)?
-;
-
-ExternOrCompare:
-	/*Extern | */Compare
-;
-
-Extern:
-	call=[TypedParameter] '(' exps+=Exp (',' exps+=Exp)* ')'
 ;
 
 Compare:
@@ -137,11 +156,7 @@ Factor:
 ;
 
 Prim:
-	Number /*| Variable */| '(' exp=Exp ')'
-;
-
-Variable:
-	var=[Require]
+	Number | '(' exp=Exp ')'
 ;
 
 Number:

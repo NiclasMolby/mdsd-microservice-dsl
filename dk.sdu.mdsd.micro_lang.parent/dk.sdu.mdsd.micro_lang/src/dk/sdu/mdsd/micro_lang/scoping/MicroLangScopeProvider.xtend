@@ -3,6 +3,18 @@
  */
 package dk.sdu.mdsd.micro_lang.scoping
 
+import com.google.inject.Inject
+import dk.sdu.mdsd.micro_lang.MicroLangModelUtil
+import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
+import dk.sdu.mdsd.micro_lang.microLang.MicroLangPackage
+import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
+import dk.sdu.mdsd.micro_lang.microLang.impl.EndpointImpl
+import dk.sdu.mdsd.micro_lang.microLang.impl.GivenImpl
+import dk.sdu.mdsd.micro_lang.microLang.impl.OperationImpl
+import org.eclipse.emf.ecore.EObject
+import org.eclipse.emf.ecore.EReference
+import org.eclipse.xtext.EcoreUtil2
+import org.eclipse.xtext.scoping.Scopes
 
 /**
  * This class contains custom scoping description.
@@ -11,5 +23,20 @@ package dk.sdu.mdsd.micro_lang.scoping
  * on how and when to use it.
  */
 class MicroLangScopeProvider extends AbstractMicroLangScopeProvider {
+	@Inject
+	extension MicroLangModelUtil
+	
+	override getScope(EObject context, EReference reference) {
+		if (context instanceof GatewayCondition && reference == MicroLangPackage.Literals.GATEWAY_CONDITION__PARAMETER) {
+	        val container = context.eContainer as GivenImpl
+	        val givenOperation = container.eContainer as OperationImpl
+	        
+	        val root = givenOperation.eContainer as EndpointImpl
+	        val candidates = EcoreUtil2.getAllContentsOfType(root, TypedParameter)
+	        candidates.addAll(resolveMethodReference(container.left, givenOperation).statements.filter(TypedParameter))
 
+		    return Scopes.scopeFor(candidates)  
+    	}
+		super.getScope(context, reference)
+	}
 }

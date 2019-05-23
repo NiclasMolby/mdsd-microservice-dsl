@@ -6,18 +6,21 @@ package dk.sdu.mdsd.micro_lang.generator
 import com.google.common.base.CaseFormat
 import com.google.inject.Inject
 import dk.sdu.mdsd.micro_lang.MicroLangModelUtil
-import dk.sdu.mdsd.micro_lang.microLang.Argument
+import dk.sdu.mdsd.micro_lang.microLang.Comparison
 import dk.sdu.mdsd.micro_lang.microLang.Endpoint
-import dk.sdu.mdsd.micro_lang.microLang.Implements
+import dk.sdu.mdsd.micro_lang.microLang.Gateway
+import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
+import dk.sdu.mdsd.micro_lang.microLang.GatewayGivenPath
+import dk.sdu.mdsd.micro_lang.microLang.Given
 import dk.sdu.mdsd.micro_lang.microLang.Logic
 import dk.sdu.mdsd.micro_lang.microLang.LogicAnd
-import dk.sdu.mdsd.micro_lang.microLang.Method
 import dk.sdu.mdsd.micro_lang.microLang.Microservice
-import dk.sdu.mdsd.micro_lang.microLang.NormalPath
 import dk.sdu.mdsd.micro_lang.microLang.Operation
 import dk.sdu.mdsd.micro_lang.microLang.Return
 import dk.sdu.mdsd.micro_lang.microLang.Type
 import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
+import dk.sdu.mdsd.micro_lang.microLang.Usable
+import java.util.ArrayList
 import java.util.List
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
@@ -34,76 +37,77 @@ import static extension dk.sdu.mdsd.micro_lang.generator.NameAndPackage.operator
  * See https://www.eclipse.org/Xtext/documentation/303_runtime_concepts.html#code-generation
  */
 class MicroLangGenerator extends AbstractGenerator {
-	
+
 	@Inject
 	extension MicroLangModelUtil
-	
+
 	@Inject
 	extension FileSystemAccessExtension
-	
+
 	public static val GEN_FILE_EXT = ".java"
-	
+
 	public static val GEN_INTERFACE_DIR = "microservices/"
 	public static val GEN_ABSTRACT_DIR = GEN_INTERFACE_DIR + "abstr/"
 	public static val GEN_PROXY_DIR = GEN_INTERFACE_DIR + "proxy/"
 	public static val GEN_IMPL_DIR = "impl/"
-	
+
 	public static val RES_LIB_DIR = 'src/resources/generator/'
-	
+
 	var IFileSystemAccess2 fsa
 
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		this.fsa = fsa
-		val microservices = resource.allContents.filter(Microservice).toList
-		microservices.forEach[generateMicroservice(microservices)]
-		
+		val usables = resource.allContents.filter(Usable).toList
+		usables.forEach[generateMicroservice(usables)]
+
 		fsa.generateFilesFromDir(RES_LIB_DIR)
-		
+
 		fsa.addSrcGenToClassPath
 		fsa.fixJreInClassPath
 	}
-	
-	def generateMicroservice(Microservice microservice, List<Microservice> microservices) {
-		val interfaceTuple = microservice.generateFile(microservice.name.toFileName, GEN_INTERFACE_DIR, [tuple | 
+
+	def generateMicroservice(Usable microservice, List<Usable> microservices) {
+		val interfaceTuple = microservice.generateFile(microservice.name.toFileName, GEN_INTERFACE_DIR, [ tuple |
 			microservice.generateInterface(tuple)
 		])
-		
+
 		if (!find(microservice, microservices).empty) {
-			microservice.generateFile(microservice.name.toProxyName, GEN_PROXY_DIR, [tuple | 
+			microservice.generateFile(microservice.name.toProxyName, GEN_PROXY_DIR, [ tuple |
 				microservice.generateProxyClass(tuple, interfaceTuple)
 			])
 		}
-		
-		val abstractTuple = microservice.generateFile("Abstract" + interfaceTuple.name, GEN_ABSTRACT_DIR, [tuple | 
+
+		val abstractTuple = microservice.generateFile("Abstract" + interfaceTuple.name, GEN_ABSTRACT_DIR, [ tuple |
 			microservice.generateAbstractClass(tuple, interfaceTuple)
 		])
-		
-		microservice.generateFile(interfaceTuple.name + "Impl", GEN_IMPL_DIR, [tuple | 
+
+		microservice.generateFile(interfaceTuple.name + "Impl", GEN_IMPL_DIR, [ tuple |
 			microservice.generateStubClass(tuple, abstractTuple)
-		], [fileName, contents | 
+		], [ fileName, contents |
 			fsa.generateFileInSrcIfAbsent(fileName, contents)
 			fsa.setFilesInSrcAsNotDerived(GEN_IMPL_DIR)
 		])
 	}
-	
-	def generateFile(Microservice microservice, String name, String dir, (NameAndPackage) => CharSequence contentGen) {
-		microservice.generateFile(name, dir, contentGen, [fileName, contents | 
+
+	def generateFile(Usable microservice, String name, String dir, (NameAndPackage)=>CharSequence contentGen) {
+		microservice.generateFile(name, dir, contentGen, [ fileName, contents |
 			fsa.generateFile(fileName, contents)
 		])
 	}
-	
-	def generateFile(Microservice microservice, String name, String dir, (NameAndPackage) => CharSequence contentGen, (String, CharSequence) => void fileGen) {
+
+	def generateFile(Usable microservice, String name, String dir, (NameAndPackage)=>CharSequence contentGen,
+		(String, CharSequence)=>void fileGen) {
 		val pkg = dir.toPackage
 		val tuple = name -> pkg
 		fileGen.apply(dir + name + GEN_FILE_EXT, contentGen.apply(tuple))
 		return tuple
 	}
-	
+
 	def toPackage(String dir) {
 		dir.replaceAll("/", ".").substring(0, dir.length - 1)
 	}
-	
-	def generateInterface(Microservice microservice, NameAndPackage interfaceTuple)'''
+
+	def dispatch generateInterface(Microservice microservice, NameAndPackage interfaceTuple) '''
 		«generateHeader»
 		package «interfaceTuple.pkg»;
 		
@@ -115,15 +119,29 @@ class MicroLangGenerator extends AbstractGenerator {
 			«microservice.generateMethods[endpoint, operation | endpoint.generateMethodSignature(operation) + ';']»
 		}
 	'''
-	
-	def generateAbstractClass(Microservice microservice, NameAndPackage abstractTuple, NameAndPackage interfaceTuple)'''
+
+	def dispatch generateInterface(Gateway microservice, NameAndPackage interfaceTuple) '''
+		«generateHeader»
+		package «interfaceTuple.pkg»;
+		
+		public interface «interfaceTuple.name» {
+			
+			String HOST = "«microservice.location.host»";
+			int PORT = «microservice.location.port»;
+			
+			«microservice.generateMethods[endpoint, operation | endpoint.generateMethodSignature(operation.findGatewayLeftOperation) + ';']»
+		}
+	'''
+
+	def dispatch generateAbstractClass(Microservice microservice, NameAndPackage abstractTuple,
+		NameAndPackage interfaceTuple) '''
 		«generateHeader»
 		package «abstractTuple.pkg»;
 		
 		import «interfaceTuple.pkg».«interfaceTuple.name»;
 		«FOR uses : microservice.uses»
-		import «interfaceTuple.pkg».«uses.name.toFileName»;
-		import «GEN_PROXY_DIR.toPackage».«uses.name.toProxyName»;
+			import «interfaceTuple.pkg».«uses.name.toFileName»;
+			import «GEN_PROXY_DIR.toPackage».«uses.name.toProxyName»;
 		«ENDFOR»
 		import lib.HttpUtil;
 		import java.util.Map;
@@ -136,7 +154,7 @@ class MicroLangGenerator extends AbstractGenerator {
 			
 			protected HttpUtil util = new HttpUtil();
 			«FOR uses : microservice.uses»
-			protected «uses.name.toFileName» «uses.name.toAttributeName» = new «uses.name.toProxyName»();
+				protected «uses.name.toFileName» «uses.name.toAttributeName» = new «uses.name.toProxyName»();
 			«ENDFOR»
 			
 			@Override
@@ -185,8 +203,81 @@ class MicroLangGenerator extends AbstractGenerator {
 		
 		}
 	'''
-	
-	def generateProxyClass(Microservice microservice, NameAndPackage proxyTuple, NameAndPackage interfaceTuple)'''
+
+	// Gateway abstract class
+	def dispatch generateAbstractClass(Gateway gateway, NameAndPackage abstractTuple, NameAndPackage interfaceTuple) '''
+		«generateHeader»
+		package «abstractTuple.pkg»;
+		
+		import «interfaceTuple.pkg».«interfaceTuple.name»;
+		«FOR reference : gateway.references»
+			import «interfaceTuple.pkg».«reference.name.toFileName»;
+			import «GEN_PROXY_DIR.toPackage».«reference.name.toProxyName»;
+		«ENDFOR»
+		import lib.HttpUtil;
+		import java.util.Map;
+		import java.util.HashMap;
+		import java.io.IOException;
+		import java.net.InetSocketAddress;
+		import com.sun.net.httpserver.HttpServer;
+		
+		public abstract class «abstractTuple.name» implements «interfaceTuple.name», Runnable {
+			
+			protected HttpUtil util = new HttpUtil();
+			«FOR reference : gateway.references»
+				private «reference.name.toFileName» «reference.name.toAttributeName» = new «reference.name.toProxyName»();
+			«ENDFOR»
+			
+			«gateway.generateMethods[endpoint, operation | endpoint.generateGatewayMethod(operation, operation.findGatewayOperations)]»
+			@Override
+			public final void run() {
+				try {
+					HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
+					server.createContext("/", exchange -> {
+						String path = exchange.getRequestURI().getPath();
+						String method = exchange.getRequestMethod();
+						System.out.println(method + " " + path);
+						String body = util.getBody(exchange.getRequestBody());
+						System.out.println("body: " + body);
+						Map<String, String> parameters = new HashMap<>();
+						try {
+							parameters = util.toMap(body);
+						}
+						catch (Exception e) {
+							util.sendResponse(exchange, 400, "Malformed parameters in body");
+							return;
+						}
+						System.out.println("parameters: " + parameters);
+						«FOR implement : gateway.implements»
+							«implement.resolve»
+							«FOR inheritedEndpoint : implement.inheritedEndpoints»
+								«inheritedEndpoint.generateServerMethod»
+							«ENDFOR»
+						«ENDFOR»
+						«FOR endpoint : gateway.endpoints»
+							«endpoint.generateServerMethod»
+						«ENDFOR»
+						«IF gateway.implements.empty && gateway.endpoints.empty»
+							util.sendResponse(exchange, 404, "No paths implemented");
+						«ELSE»
+							else {
+								util.sendResponse(exchange, 404, path + " could not be found");
+							}
+						«ENDIF»
+					});
+					server.start();
+					System.out.println("Now listening on port " + PORT);
+				}
+				catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		
+		}
+	'''
+
+	def dispatch generateProxyClass(Microservice microservice, NameAndPackage proxyTuple,
+		NameAndPackage interfaceTuple) '''
 		«generateHeader»
 		package «proxyTuple.pkg»;
 		
@@ -201,8 +292,25 @@ class MicroLangGenerator extends AbstractGenerator {
 			«microservice.generateMethods[endpoint, operation | endpoint.generateProxyMethod(operation)]»
 		}
 	'''
-	
-	def generateStubClass(Microservice microservice, NameAndPackage classTuple, NameAndPackage abstractTuple)'''
+
+	def dispatch generateProxyClass(Gateway gateway, NameAndPackage proxyTuple, NameAndPackage interfaceTuple) '''
+		«generateHeader»
+		package «proxyTuple.pkg»;
+		
+		import «interfaceTuple.pkg».«interfaceTuple.name»;
+		import lib.HttpUtil;
+		import java.io.IOException;
+		
+		public class «proxyTuple.name» implements «interfaceTuple.name» {
+			
+			private HttpUtil util = new HttpUtil();
+			
+			«gateway.generateMethods[endpoint, operation | endpoint.generateProxyMethod(operation.findGatewayLeftOperation)]»
+		}
+	'''
+
+	def dispatch generateStubClass(Microservice microservice, NameAndPackage classTuple,
+		NameAndPackage abstractTuple) '''
 		«generateHeader»
 		package «classTuple.pkg»;
 		
@@ -217,8 +325,23 @@ class MicroLangGenerator extends AbstractGenerator {
 		
 		}
 	'''
-	
-	def generateMethods(Microservice microservice, (Endpoint, Operation) => CharSequence generator)'''
+
+	def dispatch generateStubClass(Gateway gateway, NameAndPackage classTuple, NameAndPackage abstractTuple) '''
+		«generateHeader»
+		package «classTuple.pkg»;
+		
+		import «abstractTuple.pkg».«abstractTuple.name»;
+		
+		public class «classTuple.name» extends «abstractTuple.name» {
+			
+			public static void main(String[] args) {
+				new «classTuple.name»().run();
+			}
+		
+		}
+	'''
+
+	def generateMethods(Usable microservice, (Endpoint, Operation)=>CharSequence generator) '''
 		«FOR implement : microservice.implements»
 			«implement.resolve»
 			«FOR inheritedEndpoint : implement.inheritedEndpoints»
@@ -235,14 +358,14 @@ class MicroLangGenerator extends AbstractGenerator {
 			«ENDFOR»
 		«ENDFOR»
 	'''
-	
-	def generateServerMethod(Endpoint endpoint)'''
+
+	def generateServerMethod(Endpoint endpoint) '''
 		if (path.matches("«endpoint.generateRegex»")) {
 			System.out.println("«endpoint.path» was hit");
 			switch (method) {
 				«FOR operation : endpoint.operations»
 					case "«operation.method.name»": {
-						«endpoint.generateMethodInvocation(operation)»
+						«endpoint.generateMethodInvocation(operation.findGatewayLeftOperation)»
 						return;
 					}
 				«ENDFOR»
@@ -252,11 +375,11 @@ class MicroLangGenerator extends AbstractGenerator {
 			}
 		}
 	'''
-	
+
 	def generateRegex(Endpoint endpoint) {
-		endpoint.mapPaths([name ?: ""], [parameter.type.generateRegex], '\\\\/')
+		endpoint.pathParts.mapPaths([name ?: ""], [parameter.type.generateRegex], '\\\\/')
 	}
-	
+
 	def generateRegex(Type type) {
 		switch type.name {
 			case "bool": '''(true|false)'''
@@ -265,8 +388,8 @@ class MicroLangGenerator extends AbstractGenerator {
 			case "double": '''[0-9]+(\\.[0-9]+)'''
 		}
 	}
-	
-	def generateMethodInvocation(Endpoint endpoint, Operation operation)'''
+
+	def generateMethodInvocation(Endpoint endpoint, Operation operation) '''
 		«FOR entry : endpoint.mapParametersToIndex.entrySet»
 			«entry.key.generateVariableAssignment('''path.split("/")[«entry.value»]''')»
 			«IF entry.key.isRequired»«entry.key.generateRequireLogic»«ENDIF»
@@ -278,25 +401,31 @@ class MicroLangGenerator extends AbstractGenerator {
 		«IF operation.hasReturn»Object response = «ENDIF»«endpoint.toMethodName(operation)»«(endpoint.mapParametersToIndex.keySet + operation.parameters).generateArguments»;
 		util.sendResponse(exchange, 200«IF operation.hasReturn», response«ENDIF»);
 	'''
-	
+
 	def mapParametersToIndex(Endpoint endpoint) {
 		endpoint.parameterPaths.toMap([parameter], [endpoint.pathParts.indexOf(it) + 1])
 	}
+
+	def generateTypeCast(Type type, String value) '''«type.generateBoxedType».valueOf(«value»)'''
+
+	def generateVariableAssignment(TypedParameter param, String value) 
+	'''«param.type.generateType» «param.name» = «param.type.generateTypeCast(value)»;'''
+
+	def generateMethodSignature(Endpoint endpoint, Operation operation) 
+	'''«operation.returnType.generateReturn» «endpoint.toMethodName(operation)»«endpoint.parameters(operation).generateParameters»'''
+
+	def generateParameters(Iterable<TypedParameter> params) 
+	'''(«FOR param : params SEPARATOR ', '»«param.type.generateType» «param.name»«ENDFOR»)'''
+
+	def generateArguments(Iterable<TypedParameter> params) {
+		generateArgumentsFromStrings(params.map[param | param.name])
+	}
+
+	def generateArgumentsFromStrings(Iterable<String> params)
+	'''(«FOR param : params SEPARATOR ', '»«param»«ENDFOR»)'''
 	
-	def generateTypeCast(Type type, String value)
-		'''«type.generateBoxedType».valueOf(«value»)'''
-	
-	def generateVariableAssignment(TypedParameter param, String value)
-		'''«param.type.generateType» «param.name» = «param.type.generateTypeCast(value)»;'''
-	
-	def generateMethodSignature(Endpoint endpoint, Operation operation)
-		'''«operation.returnType.generateReturn» «endpoint.toMethodName(operation)»«endpoint.parameters(operation).generateParameters»'''
-	
-	def generateParameters(Iterable<TypedParameter> params)
-		'''(«FOR param : params SEPARATOR ', '»«param.type.generateType» «param.name»«ENDFOR»)'''
-	
-	def generateArguments(Iterable<TypedParameter> params)
-		'''(«FOR param : params SEPARATOR ', '»«param.name»«ENDFOR»)'''
+	def generateGatewayArguments(Iterable<String> params)
+	'''(«FOR param : params SEPARATOR ', '»«param.generateGatewayArgumentValue»«ENDFOR»)'''
 	
 	def generateReturn(Return returnType) {
 		if (returnType === null) {
@@ -304,60 +433,61 @@ class MicroLangGenerator extends AbstractGenerator {
 		}
 		'''«returnType.type.generateType»'''
 	}
-	
+
 	def generateRequire(TypedParameter param) {
-		if(param.isRequired) {
+		if (param.isRequired) {
 			'''
-			if (parameters.get("«param.name»") == null) {
-				util.sendResponse(exchange, 400, "Parameter «param.name» is required");
-				return;
-			}
-			«param.generateRequireLogic»
+				if (parameters.get("«param.name»") == null) {
+					util.sendResponse(exchange, 400, "Parameter «param.name» is required");
+					return;
+				}
+				«param.generateRequireLogic»
 			'''
 		}
 	}
-	
+
 	def generateRequireLogic(TypedParameter param) {
-		if(param.require.logic !== null) {
+		if (param.require.logic !== null) {
 			System.out.println(param.require.logic.generateLogicCondition(param))
 			'''
-			if («param.require.logic.generateLogicCondition(param)») {
-				util.sendResponse(exchange, 400, "Parameter must hold required conditions");
-				return;
-			}
+				if («param.require.logic.generateLogicCondition(param)») {
+					util.sendResponse(exchange, 400, "Parameter must hold required conditions");
+					return;
+				}
 			'''
 		}
 	}
-	
+
 	def String generateLogicCondition(Logic logic, TypedParameter param) {
 		val builder = new StringBuilder()
-		
+
 		builder.append(logic.left.generateLogicCondition(param))
-		if(logic.right !== null) {
+		if (logic.right !== null) {
 			builder.append(" || ")
 			builder.append(logic.right.generateLogicCondition(param))
 		}
-		
+
 		builder.toString
 	}
-	
+
 	def String generateLogicCondition(LogicAnd logic, TypedParameter param) {
 		val builder = new StringBuilder()
-		
-		builder.append('''!(«param.generateRequireAttributeMethodCall(logic.left.left.attribute)» «logic.left.op.operator» «logic.left.right.resolve»)''')
 
-		if(logic.right !== null) {
+		builder.
+			append('''!(«param.generateRequireAttributeMethodCall(logic.attribute)» «logic.left.op.operator» «logic.exp.resolve»)''')
+
+		if (logic.right !== null) {
 			builder.append(" && ")
 			builder.append(logic.right.generateLogicCondition(param))
 		}
-		
+
 		builder.toString
 	}
-	
+
 	def isRequired(TypedParameter param) {
 		param.require !== null
 	}
-	
+
 	def generateType(Type type) {
 		switch type.name {
 			case "string": "String"
@@ -365,7 +495,7 @@ class MicroLangGenerator extends AbstractGenerator {
 			default: type.name
 		}
 	}
-	
+
 	def generateBoxedType(Type type) {
 		val name = switch type.name {
 			case "int": "Integer"
@@ -374,7 +504,7 @@ class MicroLangGenerator extends AbstractGenerator {
 		}
 		name.toFirstUpper
 	}
-	
+
 	def generateInitialTypeValue(Type type) {
 		switch type.name {
 			case "int": "0"
@@ -384,29 +514,48 @@ class MicroLangGenerator extends AbstractGenerator {
 		}
 	}
 	
+	def generateGatewayArgumentValue(String type) {
+		switch type {
+			case "int": "0"
+			case "double": "0"
+			case "bool": "false"
+			case "string": '""'
+			default: type
+		}
+	}
+
 	def generateRequireAttributeMethodCall(TypedParameter param, String attribute) {
 		switch param.type.name {
-			case "string": 
+			case "string":
 				switch attribute {
 					case "length": '''«param.name».length()'''
 				}
 			case "int",
 			case "double":
 				switch attribute {
-					case "value": param.name 
+					case "value": param.name
 				}
 		}
 	}
-	
-	def generateStubMethod(Endpoint endpoint, Operation operation)'''
+
+	def generateStubMethod(Endpoint endpoint, Operation operation) '''
 		@Override
 		public «endpoint.generateMethodSignature(operation)» {
 			//TODO: implement endpoint logic here
 			«operation.returnType.generateStubReturn»
 		}
 	'''
-	
-	def generateProxyMethod(Endpoint endpoint, Operation operation)'''
+
+	def generateGatewayMethod(Endpoint endpoint, Operation operation, Pair<Operation, Operation> gateWayOperations) '''
+		@Override
+		public «endpoint.generateMethodSignature(gateWayOperations.key)» {
+			«FOR Given given : operation.statements.filter(Given)»
+				«given.generateGatewayGiven(endpoint, gateWayOperations.key, gateWayOperations.value)»
+			«ENDFOR»
+		}
+	'''
+
+	def generateProxyMethod(Endpoint endpoint, Operation operation) '''
 		@Override
 		public «endpoint.generateMethodSignature(operation)» {
 			try {
@@ -419,78 +568,127 @@ class MicroLangGenerator extends AbstractGenerator {
 			«operation.returnType.generateStubReturn»
 		}
 	'''
-	
+
 	def generateStubReturn(Return returnType) {
 		if (returnType === null) {
 			return ''''''
 		}
 		switch returnType.type.name {
 			case "bool": '''return false;'''
-			case "double", 
+			case "double",
 			case "int": '''return 0;'''
 			default: '''return null;'''
 		}
 	}
 	
-	def toParameterPath(Endpoint endpoint) {
-		endpoint.mapPaths([name], ['''" + «parameter.name» + "'''], '/')
+	def findGatewayOperations(Operation operation) {
+		operation.findGatewayLeftOperation -> operation.findGatewayRightOperation
 	}
-		
+
+	def findGatewayLeftOperation(Operation operation) {
+		var Operation foundOperation = operation
+		if (operation.firstGiven === null)
+			foundOperation
+		else 
+			operation.firstGiven.left.resolveMethodReference(operation)
+	}
+	
+	def findGatewayRightOperation(Operation operation) {
+		var Operation foundOperation = operation
+		if (operation.firstGiven === null)
+			foundOperation
+		else 
+			operation.firstGiven.right.resolveMethodReference(operation)
+	}
+
+	def generateGatewayGiven(Given given, Endpoint endpoint, Operation operation, Operation rightOperation) '''
+		if («given.condition.generateGatewayCondition(endpoint, operation)») {
+			«IF operation.returnType !== null»return «ENDIF»«given.left.microservice.name.toAttributeName».«given.left.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(given.left.pathParts.parameters(operation), endpoint).generateGatewayArguments»;
+			//«given.left.microservice.name»«given.left.pathParts.path»
+		}
+		else {
+			«IF operation.returnType !== null»return «ENDIF»«given.right.microservice.name.toAttributeName».«given.right.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(given.right.pathParts.parameters(rightOperation), endpoint).generateGatewayArguments»;
+			//«given.right.microservice.name»«given.right.pathParts.path»
+		}
+	'''
+	
+	def generateGatewayCondition(GatewayCondition condition, Endpoint endpoint, Operation operation) 
+	'''«IF condition.parameter !== null»«condition.generateGatewayConditionParameter»«ELSE»«condition.generateGatewayConditionEndpoint(endpoint, operation)»«ENDIF»'''
+	
+	def generateGatewayConditionParameter(GatewayCondition condition) 
+	'''«condition.parameter.name»«condition.generateGatewayConditionEndpointComparison»'''
+	
+	def generateGatewayConditionEndpoint(GatewayCondition condition, Endpoint endpoint, Operation operation) 
+	'''«condition.endpoint.microservice.name.toAttributeName».«condition.endpoint.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(endpoint.parameters(operation), endpoint).generateGatewayArguments»«condition.generateGatewayConditionEndpointComparison»'''
+	
+	def generateGatewayConditionEndpointComparison(GatewayCondition condition) {
+		if (condition.op !== null){
+			if (condition.comparison.stringValue !== null) {
+				'''.equals(«condition.comparison.generateComparison»)'''
+			} 
+			else {
+				''' «condition.op.operator» «condition.comparison.generateComparison»'''	
+			}
+		} 
+	}
+	
+	def generateComparison(Comparison comparison)
+	'''«IF comparison.stringValue !== null»"«comparison.stringValue»"«ELSE»«comparison.intValue»«ENDIF»'''
+	
+	def mapGatewayParamToCallMethod(Operation givenOperation, Iterable<TypedParameter> requiredArguments, Endpoint endpoint) {
+		var List<String> returnArgs = new ArrayList()
+		for (TypedParameter requiredArgument : requiredArguments) {
+			if (endpoint.parameters(givenOperation).exists[givenArgument|givenArgument.name == requiredArgument.name])
+				returnArgs.add(requiredArgument.name)
+			else {
+				returnArgs.add(requiredArgument.type.name)
+			}
+		}
+		returnArgs
+	}
+
+	def toParameters(List<GatewayGivenPath> paths) {
+		paths.filter(path|path.target !== null).map[target]
+	}
+
+	def toParameterPath(Endpoint endpoint) {
+		endpoint.pathParts.mapPaths([name], ['''" + «parameter.name» + "'''], '/')
+	}
+
 	def paramsToBody(Operation operation) {
 		operation.parameters.map['''«name»=" + «name» + "'''].join('&')
 	}
-	
+
 	def toFileName(String name) {
 		CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, name)
 	}
-	
+
 	def toAttributeName(String name) {
 		CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, name)
 	}
-	
+
 	def toProxyName(String name) {
 		name.toFileName + 'Proxy'
 	}
-	
+
 	def toMethodName(Endpoint endpoint, Operation operation) {
 		var pathName = endpoint.normalPaths.map[name ?: ""].join("_")
 		val operationName = operation.method.name.toLowerCase
 		pathName = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, pathName)
 		operationName + pathName
 	}
-	
-	def void resolve(Implements implement) {
-		val args = implement.arguments.map[name]
-		implement.target.parameters.forEach[parameter, index | 
-			find(parameter, parameter.eContainer).forEach[EObject.resolve(args.get(index))]
-		]
-		implement.target.implements.forEach[resolve]
+
+	def toMethodName(List<GatewayGivenPath> gatewayPaths, Operation operation) {
+		var pathName = gatewayPaths.map[name ?: ""].join("_")
+		val operationName = operation.method.name.toLowerCase
+		pathName = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, pathName)
+		operationName + pathName
 	}
-	
-	def dispatch resolve(Argument argument, String arg) {
-		argument.name = arg
-	}
-	
-	def dispatch resolve(NormalPath path, String arg) {
-		path.name = arg
-	}
-	
-	def dispatch resolve(Method method, String arg) {
-		method.name = arg
-	}
-	
-	def dispatch resolve(TypedParameter parameter, String arg) {
-		parameter.name = arg
-	}
-	
-	def dispatch resolve(Type type, String arg) {
-		type.name = arg
-	}
-	
-	def generateHeader()'''
+
+	def generateHeader() '''
 		/**
 		 * Generated by MicroLang
 		 */
- 	'''
-	
+	'''
+
 }
