@@ -13,9 +13,8 @@ terminal END: 'synthetic:END';
 terminal IP returns ecore::EString: INT ('.' INT)+;
 
 Element:
-	Template | Usable//Microservice | Gateway
+	Template | Usable
 ;
-
 
 Usable:
 	Microservice | Gateway
@@ -51,7 +50,7 @@ Declaration:
 ;
 
 Uses:
-	'uses' target=[Usable]//(target=[Gateway] | target=[Microservice])
+	'uses' target=[Usable]
 ;
 
 Implements:
@@ -136,14 +135,6 @@ LogicAnd:
 	left=Compare ('&&' right=LogicAnd)?
 ;
 
-ExternOrCompare:
-	/*Extern | */Compare
-;
-
-Extern:
-	call=[TypedParameter] '(' exps+=Exp (',' exps+=Exp)* ')'
-;
-
 Compare:
 	left=Attribute op=COp right=Exp
 ;
@@ -165,11 +156,7 @@ Factor:
 ;
 
 Prim:
-	Number /*| Variable */| '(' exp=Exp ')'
-;
-
-Variable:
-	var=[Require]
+	Number | '(' exp=Exp ')'
 ;
 
 Number:
