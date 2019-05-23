@@ -5,6 +5,9 @@ package dk.sdu.mdsd.micro_lang.validation
 
 import com.google.inject.Inject
 import dk.sdu.mdsd.micro_lang.MicroLangModelUtil
+import dk.sdu.mdsd.micro_lang.microLang.Gateway
+import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
+import dk.sdu.mdsd.micro_lang.microLang.Given
 import dk.sdu.mdsd.micro_lang.microLang.Implements
 import dk.sdu.mdsd.micro_lang.microLang.MicroLangPackage
 import dk.sdu.mdsd.micro_lang.microLang.Microservice
@@ -14,6 +17,7 @@ import dk.sdu.mdsd.micro_lang.microLang.Parameter
 import dk.sdu.mdsd.micro_lang.microLang.ParameterPath
 import dk.sdu.mdsd.micro_lang.microLang.Return
 import dk.sdu.mdsd.micro_lang.microLang.TypedParameter
+import dk.sdu.mdsd.micro_lang.microLang.Usable
 import dk.sdu.mdsd.micro_lang.microLang.Uses
 import dk.sdu.mdsd.micro_lang.microLang.impl.GatewayImpl
 import java.util.Set
@@ -21,8 +25,6 @@ import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.validation.Check
 
 import static org.eclipse.emf.ecore.util.EcoreUtil.UsageCrossReferencer.find
-import dk.sdu.mdsd.micro_lang.microLang.GatewayCondition
-import dk.sdu.mdsd.micro_lang.microLang.Given
 
 /**
  * This class contains custom validation rules. 
@@ -68,6 +70,10 @@ class MicroLangValidator extends AbstractMicroLangValidator {
 	public static val GIVEN_CONDITION_REFERED_METHOD_NOT_GET = ISSUE_CODE_PREFIX + 'GivenConditionReferedMethodNotGET'
 	
 	public static val GIVEN_CONDITION_REQUIED_ARG_CANNOT_BE_PARSED = ISSUE_CODE_PREFIX + 'GivenConditionRequiredArgCannotBeParsed'
+	
+	public static val GATEWAY_NO_USES_OR_IMPLEMENTS = ISSUE_CODE_PREFIX + 'GatewayNoUsesOrImplements'
+	
+	public static val GATEWAY_ENDPOINTS_CONTAIN_NO_ATTRIBUTES_OR_RETURN = ISSUE_CODE_PREFIX + 'GatewayEndpointsContainNoAttributesOrReturn'
 	
 	val epackage = MicroLangPackage.eINSTANCE
 	
@@ -315,13 +321,63 @@ class MicroLangValidator extends AbstractMicroLangValidator {
 	
 	@Check
 	def checkSelfNotInUses(Uses uses) {
-		val container = uses.eContainer as Microservice
+		val container = uses.eContainer as Usable
 		if (uses.target === container) {
 			error('Microservice "' + container.name + '" references itself', 
 				uses, 
 				epackage.uses_Target, 
 				USES_SELF, 
 				uses.target.name)
+		}
+	}
+	
+	@Check
+	def checkGatewayNoUses(Uses uses) {
+		if (uses.eContainer instanceof Gateway) {
+			error('A gateway cannot use another gateway or microserivce', 
+				uses, 
+				epackage.uses_Target,
+				GATEWAY_NO_USES_OR_IMPLEMENTS)
+		}
+	}
+	
+	@Check
+	def checkGatewayNoImplements(Implements implement) {	
+		if (implement.eContainer instanceof Gateway) {
+			error('A gateway cannot implement a template', 
+				implement, 
+				epackage.implements_Target,
+				GATEWAY_NO_USES_OR_IMPLEMENTS)
+		}
+	}
+	
+	@Check
+	def checkGatewayNoAttributes(Operation operation) {
+		val root = operation.eContainer.eContainer
+		if (root instanceof Gateway) {
+			operation.statements.forEach[statement, index | 
+				if(statement instanceof TypedParameter){
+					error('A gateway endpoint cannot contain attributes', 
+						epackage.operation_Statements, 
+						index,
+						GATEWAY_ENDPOINTS_CONTAIN_NO_ATTRIBUTES_OR_RETURN)
+				}
+			]
+		}
+	}
+	
+	@Check
+	def checkGatewayReturn(Operation operation) {
+		val root = operation.eContainer.eContainer
+		if (root instanceof Gateway) {
+			operation.statements.forEach[statement, index | 
+				if(statement instanceof Return){
+					error('A gateway endpoint cannot contain a return statement', 
+						epackage.operation_Statements, 
+						index,
+						GATEWAY_ENDPOINTS_CONTAIN_NO_ATTRIBUTES_OR_RETURN)
+				}
+			]
 		}
 	}
 	
