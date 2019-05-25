@@ -108,7 +108,7 @@ TypedParameter:
 ;
 
 Given:
-	'given' condition=GatewayCondition left=MicroserviceEndpoint 'else' right=MicroserviceEndpoint
+	'given' condition=GatewayCondition 'use' left=MicroserviceEndpoint 'else' right=MicroserviceEndpoint
 ;
 
 GatewayCondition:
