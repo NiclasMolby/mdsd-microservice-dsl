@@ -604,11 +604,9 @@ class MicroLangGenerator extends AbstractGenerator {
 	def generateGatewayGiven(Given given, Endpoint endpoint, Operation operation, Operation rightOperation) '''
 		if («given.condition.generateGatewayCondition(endpoint, operation)») {
 			«IF operation.returnType !== null»return «ENDIF»«given.left.microservice.name.toAttributeName».«given.left.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(given.left.pathParts.parameters(operation), endpoint).generateGatewayArguments»;
-			//«given.left.microservice.name»«given.left.pathParts.path»
 		}
 		else {
 			«IF operation.returnType !== null»return «ENDIF»«given.right.microservice.name.toAttributeName».«given.right.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(given.right.pathParts.parameters(rightOperation), endpoint).generateGatewayArguments»;
-			//«given.right.microservice.name»«given.right.pathParts.path»
 		}
 	'''
 	
