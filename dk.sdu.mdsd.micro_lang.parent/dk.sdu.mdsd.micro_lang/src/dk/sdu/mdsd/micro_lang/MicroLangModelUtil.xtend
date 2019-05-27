@@ -86,6 +86,10 @@ class MicroLangModelUtil {
 		operation.statements.filter(TypedParameter)
 	}
 	
+	def parameters(List<GatewayGivenPath> paths) {
+		paths.filter[target !== null].map[target]
+	}
+	
 	def parameters(Endpoint endpoint, Operation operation) {
 		endpoint.parameterPaths.map[parameter] + operation.parameters
 	}

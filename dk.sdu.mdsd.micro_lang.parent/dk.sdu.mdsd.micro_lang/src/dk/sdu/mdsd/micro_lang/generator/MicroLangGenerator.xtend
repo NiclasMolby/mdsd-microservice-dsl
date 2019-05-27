@@ -610,14 +610,19 @@ class MicroLangGenerator extends AbstractGenerator {
 		}
 	'''
 	
-	def generateGatewayCondition(GatewayCondition condition, Endpoint endpoint, Operation operation) 
-	'''«IF condition.parameter !== null»«condition.generateGatewayConditionParameter»«ELSE»«condition.generateGatewayConditionEndpoint(endpoint, operation)»«ENDIF»'''
+	def generateGatewayCondition(GatewayCondition condition, Endpoint endpoint, Operation operation) {
+		if (condition.parameter !== null)
+			condition.generateGatewayConditionParameter
+		else 
+			condition.generateGatewayConditionEndpoint(endpoint, operation)
+	}
+	//'''«IF condition.parameter !== null»«condition.generateGatewayConditionParameter»«ELSE»«condition.generateGatewayConditionEndpoint(endpoint, operation)»«ENDIF»'''
 	
 	def generateGatewayConditionParameter(GatewayCondition condition) 
 	'''«condition.parameter.name»«condition.generateGatewayConditionEndpointComparison»'''
 	
 	def generateGatewayConditionEndpoint(GatewayCondition condition, Endpoint endpoint, Operation operation) 
-	'''«condition.endpoint.microservice.name.toAttributeName».«condition.endpoint.pathParts.toMethodName(operation)»«operation.mapGatewayParamToCallMethod(endpoint.parameters(operation), endpoint).generateGatewayArguments»«condition.generateGatewayConditionEndpointComparison»'''
+	'''«condition.endpoint.microservice.name.toAttributeName».«condition.endpoint.pathParts.toMethodName("GET")»«operation.mapGatewayParamToCallMethod(condition.endpoint.pathParts.parameters, endpoint).generateGatewayArguments»«condition.generateGatewayConditionEndpointComparison»'''
 	
 	def generateGatewayConditionEndpointComparison(GatewayCondition condition) {
 		if (condition.op !== null){
@@ -675,12 +680,16 @@ class MicroLangGenerator extends AbstractGenerator {
 		pathName = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, pathName)
 		operationName + pathName
 	}
-
-	def toMethodName(List<GatewayGivenPath> gatewayPaths, Operation operation) {
+	
+	def toMethodName(List<GatewayGivenPath> gatewayPaths, String method) {
 		var pathName = gatewayPaths.map[name ?: ""].join("_")
-		val operationName = operation.method.name.toLowerCase
+		val operationName = method.toLowerCase
 		pathName = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, pathName)
 		operationName + pathName
+	}
+
+	def toMethodName(List<GatewayGivenPath> gatewayPaths, Operation operation) {
+		toMethodName(gatewayPaths, operation.method.name)
 	}
 
 	def generateHeader() '''
