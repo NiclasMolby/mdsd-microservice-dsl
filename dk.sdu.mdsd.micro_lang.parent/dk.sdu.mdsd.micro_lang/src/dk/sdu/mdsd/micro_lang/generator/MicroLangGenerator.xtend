@@ -448,7 +448,6 @@ class MicroLangGenerator extends AbstractGenerator {
 
 	def generateRequireLogic(TypedParameter param) {
 		if (param.require.logic !== null) {
-			System.out.println(param.require.logic.generateLogicCondition(param))
 			'''
 				if («param.require.logic.generateLogicCondition(param)») {
 					util.sendResponse(exchange, 400, "Parameter must hold required conditions");
